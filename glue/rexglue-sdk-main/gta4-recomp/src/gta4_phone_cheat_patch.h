@@ -88,12 +88,22 @@ inline gta4::quicksave::PhonePatch BuildCheatsPatch(
   // profile-specific; enumerate only declared locals, requiring one match.
   size_t render = linked.size();
   for (uint32_t local = 0; local < p.local_count; ++local) {
-    std::vector<uint8_t> args;
-    Local(args, p.menu_local); Local(args, p.options_local); Local(args, local);
-    Int(args, 1); Int(args, 1); Int(args, 0);
-    if (finish >= args.size() && std::equal(args.begin(), args.end(), linked.begin() + finish - args.size())) {
-      if (render != linked.size()) throw std::runtime_error("Ambiguous cheats renderer arguments");
-      render = finish - args.size();
+    // Retail uses PUSH_S for some small offsets (also seen in the verified
+    // accept-site +60 operand), although the VM accepts compact constants.
+    for (unsigned encoding = 0; encoding < (local <= 159 ? 2u : 1u); ++encoding) {
+      std::vector<uint8_t> args;
+      Local(args, p.menu_local); Local(args, p.options_local);
+      if (encoding) {
+        args.insert(args.end(), {kPushS, uint8_t(local), uint8_t(local >> 8), kLocal});
+      } else {
+        Local(args, local);
+      }
+      Int(args, 1); Int(args, 1); Int(args, 0);
+      if (finish >= args.size() && starts[finish - args.size()] &&
+          std::equal(args.begin(), args.end(), linked.begin() + finish - args.size())) {
+        if (render != linked.size()) throw std::runtime_error("Ambiguous cheats renderer arguments");
+        render = finish - args.size();
+      }
     }
   }
   if (render <= label || render == linked.size())

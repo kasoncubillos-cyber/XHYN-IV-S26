@@ -26,7 +26,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: s26-phone-native-ci
+  group: s26-phone-native-ci-${{ github.event_name }}
   cancel-in-progress: true
 
 jobs:

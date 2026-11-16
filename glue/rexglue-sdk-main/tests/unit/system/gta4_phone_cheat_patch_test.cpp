@@ -19,7 +19,7 @@ struct Fixture {
   PhoneProfile p = kPhoneProfiles[0];
   std::vector<uint8_t> code = std::vector<uint8_t>(p.code_size);
   size_t reset = 0x3000, render = 0, accept = 0x4000, stock = 0x2800;
-  Fixture() {
+  explicit Fixture(bool stock_offset = false) {
     std::vector<uint8_t> prefix;
     Local(prefix, p.menu_local); Local(prefix, p.options_local);
     std::copy_n(prefix.begin(), 5, code.begin() + p.append_site);
@@ -39,7 +39,9 @@ struct Fixture {
     // The actual loop calls the option helper before finalizing.
     Branch(prefix, kCall, p.append_function);
     render = reset + prefix.size();
-    Local(prefix, p.menu_local); Local(prefix, p.options_local); Local(prefix, 38);
+    Local(prefix, p.menu_local); Local(prefix, p.options_local);
+    if (stock_offset) prefix.insert(prefix.end(), {kPushS, 38, 0, kLocal});
+    else Local(prefix, 38);
     Int(prefix, 1); Int(prefix, 1); Int(prefix, 0); Branch(prefix, kCall, 0x2100);
     std::copy(prefix.begin(), prefix.end(), code.begin() + reset);
     prefix.clear(); Local(prefix, p.menu_local); prefix.insert(prefix.end(), {kPushS, 60, 0});
@@ -55,6 +57,7 @@ struct Fixture {
   }
 };
 void Verify() {
+  Fixture retail(true); CHECK_P(retail.Patch().code[retail.reset + 5] == kJump);
   Fixture f;
   auto out = f.Patch();
   CHECK_P(out.code[f.reset + 5] == kJump);
