@@ -1,0 +1,129 @@
+name: S26 Beta2 Spanish and Ultra APK
+
+on:
+  push:
+    branches:
+      - feature/s26-alpha2-es-visual
+    paths:
+      - .github/workflows/s26-beta2-apk.yml
+      - os/android/app/build.gradle.kts
+      - os/android/app/src/main/res/values/strings.xml
+      - os/android/app/src/main/java/com/libertyrecomp/**
+      - os/android/app/src/test/java/com/libertyrecomp/**
+      - os/android/scripts/env.sh
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: s26-beta2-apk
+  cancel-in-progress: true
+
+jobs:
+  beta:
+    name: Validate, sign and publish Beta2 APK using verified Alpha1 engine
+    runs-on: ubuntu-24.04
+    timeout-minutes: 85
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          submodules: false
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+
+      - name: Install Android build tools and pinned SDL3 Java sources
+        run: |
+          set -euo pipefail
+          sdkmanager --licenses >/dev/null <<<'y' || true
+          sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+          git submodule update --init glue/rexglue-sdk-main/thirdparty/sdl3
+          test -d glue/rexglue-sdk-main/thirdparty/sdl3/android-project/app/src/main/java
+          echo "ANDROID_SDK_ROOT=$ANDROID_HOME" >> "$GITHUB_ENV"
+
+      - name: Download and verify stable Alpha1 native baseline
+        run: |
+          set -euo pipefail
+          mkdir -p out
+          curl -fL --retry 3 --retry-delay 3 \
+            "https://github.com/$GITHUB_REPOSITORY/releases/download/s26-alpha1/XHYN-IV-S26-Alpha1-signed.apk" \
+            -o out/baseline-alpha1.apk
+          echo "001fc241290931c7817c9db19d3e77ec0589b8dfa34d80429646ae077c86b43b  out/baseline-alpha1.apk" | sha256sum -c -
+          echo "Pinned native engine preserved from the stable working Alpha1."
+
+      - name: Verify isolated beta identity
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          gradle=Path('os/android/app/build.gradle.kts').read_text()
+          assert 'applicationId = "com.kasoncubillos.xhynivs26beta"' in gradle
+          assert 'versionName   = "0.5.9.4-s26-beta2"' in gradle
+          assert 'versionCode = 2' in gradle
+          assert 'gta4_frame_limit", "30"' not in Path('os/android/app/src/main/java/com/libertyrecomp/S26GraphicsProfiles.java').read_text().replace('putIfAbsent("gta4_frame_limit", "30")','')
+          print('Beta2 is isolated from working Alpha1; code preserves the selected FPS setting.')
+          PY
+
+      - name: Test Spanish UI and Ultra Visual profiles
+        working-directory: os/android
+        run: ./gradlew --no-daemon --max-workers=2 :app:testDebugUnitTest
+
+      - name: Sign independent Beta2 APK with preserved Alpha1 native engine
+        run: |
+          set -euo pipefail
+          PASSWORD="$(openssl rand -hex 24)"
+          printf '%s' "$PASSWORD" > "$RUNNER_TEMP/s26-beta2-password.txt"
+          chmod 600 "$RUNNER_TEMP/s26-beta2-password.txt"
+          keytool -genkeypair -noprompt -storetype PKCS12 \
+            -keystore "$RUNNER_TEMP/s26-beta2.p12" \
+            -alias s26-beta2 -keyalg RSA -keysize 3072 -validity 365 \
+            -storepass "$PASSWORD" -keypass "$PASSWORD" \
+            -dname "CN=XHYN IV S26 Beta2 independent, O=Personal Test, C=CL"
+          unset PASSWORD
+          python3 os/android/scripts/package_release.py \
+            --native-apk out/baseline-alpha1.apk \
+            --native-apk-sha256 001fc241290931c7817c9db19d3e77ec0589b8dfa34d80429646ae077c86b43b \
+            --keystore "$RUNNER_TEMP/s26-beta2.p12" \
+            --password-file "$RUNNER_TEMP/s26-beta2-password.txt" \
+            --alias s26-beta2 \
+            --output out/XHYN-IV-S26-Beta2-signed.apk
+          sha256sum out/XHYN-IV-S26-Beta2-signed.apk | tee out/XHYN-IV-S26-Beta2-SHA256.txt
+          rm -f "$RUNNER_TEMP/s26-beta2.p12" "$RUNNER_TEMP/s26-beta2-password.txt"
+
+      - name: Preserve Beta2 installer in Actions
+        uses: actions/upload-artifact@v4
+        with:
+          name: XHYN-IV-S26-Beta2
+          path: |
+            out/XHYN-IV-S26-Beta2-signed.apk
+            out/XHYN-IV-S26-Beta2-SHA256.txt
+          retention-days: 14
+          if-no-files-found: error
+          compression-level: 0
+
+      - name: Publish direct-download experimental Beta2 prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          APK="out/XHYN-IV-S26-Beta2-signed.apk"
+          test -s "$APK"
+          if gh release view "s26-beta2" >/dev/null 2>&1; then
+            gh release upload "s26-beta2" "$APK" --clobber
+          else
+            gh release create "s26-beta2" "$APK" \
+              --target "$GITHUB_SHA" \
+              --title "XHYN IV S26 Beta 2 — Spanish interface and Ultra graphics" \
+              --prerelease \
+              --notes "Experimental Android Beta2 (com.kasoncubillos.xhynivs26beta). Main launcher and graphics settings translated to Spanish, optional Ultra Visual quality profile, user-selected FPS cap preserved. Uses the exact verified native ARM64 game/runtime from stable Alpha1. Full game data and native GTA IV textures are not included. Beta2 installs alongside Alpha1 due to their different app IDs and signing keys. The user must provide their own legal game files and may need to import them again. Performance at Ultra and 60 FPS has NOT been validated on-device; begin with lower settings."
+          echo "Direct APK: https://github.com/$GITHUB_REPOSITORY/releases/download/s26-beta2/XHYN-IV-S26-Beta2-signed.apk" >> "$GITHUB_STEP_SUMMARY"
