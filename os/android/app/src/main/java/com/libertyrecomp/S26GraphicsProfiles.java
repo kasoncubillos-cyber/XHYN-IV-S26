@@ -13,9 +13,10 @@ final class S26GraphicsProfiles {
     static final String ULTRA_VISUAL = "ultra_visual";
     static final String POLICE_LIGHTS_TRAFFIC = "police_lights_traffic";
     static final String ULTRA_DRIVING = "ultra_driving";
+    static final String SUSTAINED_60 = "sustained_60";
 
     static void apply(Map<String,String> values, String profile) {
-        if (!BALANCED.equals(profile) && !HIGH.equals(profile) && !MAX_EXPERIMENTAL.equals(profile) && !ULTRA_VISUAL.equals(profile) && !POLICE_LIGHTS_TRAFFIC.equals(profile) && !ULTRA_DRIVING.equals(profile))
+        if (!BALANCED.equals(profile) && !HIGH.equals(profile) && !MAX_EXPERIMENTAL.equals(profile) && !ULTRA_VISUAL.equals(profile) && !POLICE_LIGHTS_TRAFFIC.equals(profile) && !ULTRA_DRIVING.equals(profile) && !SUSTAINED_60.equals(profile))
             throw new IllegalArgumentException("Unknown S26 graphics profile: " + profile);
 
         // Never overwrite a frame cap the player has already tested successfully.
@@ -134,6 +135,40 @@ final class S26GraphicsProfiles {
                 values.put("gta4_native_startup_prepare_seconds", "10");
                 values.put("gta4_native_converted_texture_disk_cache", "true");
                 values.put("gta4_native_texture_reuse_extended", "false");
+                values.put("android_gpu_turbo", "false");
+                values.put("android_thermal_guard", "true");
+                break;
+            case SUSTAINED_60:
+                // Favour cooler sustained play instead of peak benchmark quality.
+                // 1080p is the OUTPUT size; FSR1 renders fewer internal pixels.
+                // 60 FPS is the target frame limit, not a guarantee under throttling.
+                values.put("gta4_frame_limit", "60");
+                values.put("resolution", "1080p");
+                values.put("gta4_native_upscaler", "fsr1");
+                values.put("gta4_fsr1_quality", "ultra_quality");
+                values.put("gta4_fsr1_sharpness_reduction", "0.2");
+                values.put("gta4_native_anti_aliasing", "smaa");
+                values.put("gta4_native_smaa_quality", "high");
+                values.put("gta4_shadow_map_base_size", "512");
+                values.put("gta4_shadow_distance_scale", "1.0");
+                values.put("gta4_native_shadow_interval", "1");
+                values.put("gta4_reflection_resolution", "original");
+                values.put("gta4_water_reflection_resolution", "original");
+                values.put("gta4_mirror_reflection_resolution", "original");
+                values.put("gta4_reflection_aa", "off");
+                values.put("gta4_reflection_capture_distance", "near");
+                values.put("gta4_native_water_reflection_interval", "3");
+                values.put("gta4_native_environment_reflection_interval", "3");
+                values.put("gta4_draw_distance_scale", "0.9");
+                values.put("gta4_dynamic_draw_distance", "true");
+                values.put("gta4_motion_blur", "false");
+                values.put("gta4_native_pipeline_workers", "1");
+                values.put("gta4_native_pipeline_prewarm", "true");
+                values.put("gta4_native_pipeline_lookahead", "true");
+                values.put("gta4_native_startup_prepare_seconds", "10");
+                values.put("gta4_native_converted_texture_disk_cache", "true");
+                values.put("gta4_native_texture_reuse_extended", "false");
+                values.put("gta4_native_max_queued_frames", "3");
                 values.put("android_gpu_turbo", "false");
                 values.put("android_thermal_guard", "true");
                 break;

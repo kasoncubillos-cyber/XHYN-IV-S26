@@ -39,6 +39,36 @@ public class S26GraphicsProfilesTest {
         }
     }
 
+    @Test public void sustained60PresetKeepsOutput1080pAnd60FpsWithoutDisablingThermalGuard() {
+        Map<String,String> settings=new LinkedHashMap<>();
+        settings.put("gta4_frame_limit","30");
+        settings.put("unrelated_setting","keep_me");
+        S26GraphicsProfiles.apply(settings,S26GraphicsProfiles.SUSTAINED_60);
+        assertEquals("60",settings.get("gta4_frame_limit"));
+        assertEquals("1080p",settings.get("resolution"));
+        assertEquals("fsr1",settings.get("gta4_native_upscaler"));
+        assertEquals("ultra_quality",settings.get("gta4_fsr1_quality"));
+        assertEquals("smaa",settings.get("gta4_native_anti_aliasing"));
+        assertEquals("high",settings.get("gta4_native_smaa_quality"));
+        assertEquals("512",settings.get("gta4_shadow_map_base_size"));
+        assertEquals("0.9",settings.get("gta4_draw_distance_scale"));
+        assertEquals("3",settings.get("gta4_native_environment_reflection_interval"));
+        assertEquals("3",settings.get("gta4_native_water_reflection_interval"));
+        assertEquals("true",settings.get("gta4_dynamic_draw_distance"));
+        assertEquals("true",settings.get("gta4_native_converted_texture_disk_cache"));
+        assertEquals("false",settings.get("android_gpu_turbo"));
+        assertEquals("true",settings.get("android_thermal_guard"));
+        assertEquals("keep_me",settings.get("unrelated_setting"));
+    }
+
+    @Test public void sustained60RemainsOptInAndOldUltraStaysNative() {
+        Map<String,String> ultra=new LinkedHashMap<>();
+        S26GraphicsProfiles.apply(ultra,S26GraphicsProfiles.ULTRA_DRIVING);
+        assertEquals("native",ultra.get("gta4_native_upscaler"));
+        assertEquals("1024",ultra.get("gta4_shadow_map_base_size"));
+        assertEquals("1.2",ultra.get("gta4_draw_distance_scale"));
+    }
+
     @Test public void ultraDrivingPreservesNearSceneAndExisting60Fps() {
         Map<String,String> previous=new LinkedHashMap<>(),driving=new LinkedHashMap<>();
         previous.put("gta4_frame_limit","60");
