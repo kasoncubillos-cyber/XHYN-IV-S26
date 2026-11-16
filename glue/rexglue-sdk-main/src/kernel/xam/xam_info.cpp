@@ -10,6 +10,7 @@
  */
 
 #include <rex/cvar.h>
+#include <rex/system/flags.h>
 #include <rex/kernel/xam/module.h>
 #include <rex/kernel/xam/private.h>
 #include <rex/logging.h>
