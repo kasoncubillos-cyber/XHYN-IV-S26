@@ -1,0 +1,121 @@
+name: S26 Phone Cheats - Native Validation
+
+on:
+  push:
+    branches:
+      - feature/s26-telefono-cheats-v105
+    paths:
+      - .github/workflows/s26-phone-native-ci.yml
+      - glue/rexglue-sdk-main/gta4-recomp/src/gta4_phone_cheat_catalog.h
+      - glue/rexglue-sdk-main/tests/unit/system/gta4_phone_cheat_catalog_test.cpp
+      - glue/rexglue-sdk-main/gta4-recomp/src/gta4_phone_quicksave_profiles.h
+      - glue/rexglue-sdk-main/gta4-recomp/src/gta4_quicksave_hooks.cpp
+      - docs/android/S26-TELEFONO-TRUCOS-V105.md
+  workflow_dispatch:
+    inputs:
+      build_native:
+        description: 'Build full ARM64 engine and unsigned APK (never publish)'
+        type: boolean
+        default: false
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: s26-phone-native-ci
+  cancel-in-progress: true
+
+jobs:
+  catalog:
+    name: Check 25-entry phone cheat catalog
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile standalone C++20 test
+        run: |
+          set -euo pipefail
+          g++ -std=c++20 -O2 -Wall -Wextra -Werror -DGTA4_PHONE_CHEATS_STANDALONE \
+            glue/rexglue-sdk-main/tests/unit/system/gta4_phone_cheat_catalog_test.cpp \
+            -o /tmp/s26-phone-cheat-catalog-test
+          /tmp/s26-phone-cheat-catalog-test
+      - name: Check stable update identity
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import re
+          from pathlib import Path
+          gradle=Path('os/android/app/build.gradle.kts').read_text()
+          pkg=re.search(r'applicationId\s*=\s*"([^"]+)"',gradle).group(1)
+          version=int(re.search(r'versionCode\s*=\s*(\d+)',gradle).group(1))
+          assert pkg=='com.kasoncubillos.xhynivs26stable',pkg
+          assert version>=104,version
+          print(f'Preserved stable package {pkg}, versionCode {version}')
+          PY
+
+  native:
+    name: Native ARM64 compile and unsigned package (manual only)
+    if: github.event_name == 'workflow_dispatch' && inputs.build_native == true
+    needs: catalog
+    runs-on: ubuntu-24.04
+    timeout-minutes: 330
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: false
+          persist-credentials: false
+      - name: Recover build disk
+        run: |
+          sudo rm -rf /usr/share/dotnet /opt/hostedtoolcache/CodeQL /usr/local/share/powershell
+          df -h .
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - name: Install NDK, SDK and builders
+        run: |
+          set -euo pipefail
+          sdkmanager --licenses >/dev/null <<<'y' || true
+          sdkmanager 'platforms;android-35' 'build-tools;35.0.0' 'ndk;29.0.14206865'
+          python -m pip install --disable-pip-version-check 'cmake==3.31.6' ninja
+          echo "ANDROID_SDK_ROOT=$ANDROID_HOME" >> "$GITHUB_ENV"
+          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/29.0.14206865" >> "$GITHUB_ENV"
+          echo "ANDROID_NDK=$ANDROID_HOME/ndk/29.0.14206865" >> "$GITHUB_ENV"
+      - name: Fetch pinned engine dependencies
+        run: python3 tools/setup_repo.py
+      - name: Android UI unit tests
+        working-directory: os/android
+        run: ./gradlew --no-daemon --max-workers=2 :app:testDebugUnitTest
+      - name: Compile native game ARM64 (no Alpha1 reuse)
+        env:
+          BUILD_TYPE: Release
+        run: bash os/android/scripts/build_native.sh 2
+      - name: Build Vulkan driver proxy
+        run: bash os/android/scripts/build_driver_proxy.sh
+      - name: Package current native libraries, unsigned
+        run: |
+          set -euo pipefail
+          mkdir -p out
+          python3 os/android/scripts/package_release.py \
+            --unsigned \
+            --output out/S26-Phone-Review-UNSIGNED.apk
+          test -s out/S26-Phone-Review-UNSIGNED.apk
+          sha256sum out/S26-Phone-Review-UNSIGNED.apk > out/S26-Phone-Review-SHA256.txt
+          echo "This APK is unsigned: not installable; do not distribute as an update." >> "$GITHUB_STEP_SUMMARY"
+      - name: Preserve review-only build
+        uses: actions/upload-artifact@v4
+        with:
+          name: S26-Phone-Native-Review-Unsigned
+          path: |
+            out/S26-Phone-Review-UNSIGNED.apk
+            out/S26-Phone-Review-SHA256.txt
+          retention-days: 7
+          if-no-files-found: error
+          compression-level: 0
