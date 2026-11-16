@@ -40,6 +40,7 @@ final class MobileConfig {
         writeAtomic(file,text.toString());
     }
     static final Map<String,String> DEFAULTS=Collections.unmodifiableMap(new LinkedHashMap<String,String>(){{
+        put("user_language","5"); // Xbox language 5 = Spanish; users can switch to English.
         put("gta4_present_mode","immediate");put("gta4_motion_blur","false");put("gta4_native_smaa_quality","low");
         put("gta4_native_anti_aliasing","fxaa");put("gta4_native_upscaler","native");put("gta4_shadow_map_base_size","256");put("gta4_shadow_distance_scale","1.0");
         put("gta4_reflection_aa","off");put("gta4_reflection_capture_distance","near");
