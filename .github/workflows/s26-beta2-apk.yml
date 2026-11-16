@@ -126,4 +126,5 @@ jobs:
               --title "XHYN IV S26 Beta 2 — Spanish interface and Ultra graphics" \
               --prerelease \
               --notes "Experimental Android Beta2 (com.kasoncubillos.xhynivs26beta). Main launcher and graphics settings translated to Spanish, optional Ultra Visual quality profile, user-selected FPS cap preserved. Uses the exact verified native ARM64 game/runtime from stable Alpha1. Full game data and native GTA IV textures are not included. Beta2 installs alongside Alpha1 due to their different app IDs and signing keys. The user must provide their own legal game files and may need to import them again. Performance at Ultra and 60 FPS has NOT been validated on-device; begin with lower settings."
+          fi
           echo "Direct APK: https://github.com/$GITHUB_REPOSITORY/releases/download/s26-beta2/XHYN-IV-S26-Beta2-signed.apk" >> "$GITHUB_STEP_SUMMARY"
