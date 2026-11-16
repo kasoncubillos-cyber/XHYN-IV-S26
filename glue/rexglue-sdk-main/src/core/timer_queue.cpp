@@ -10,7 +10,9 @@
  */
 
 #include <algorithm>
+#include <atomic>
 #include <forward_list>
+#include <thread>
 
 #include <disruptorplus/multi_threaded_claim_strategy.hpp>
 #include <disruptorplus/ring_buffer.hpp>
@@ -39,12 +41,22 @@ class TimerQueue {
         claim_strategy_(kWaitCount, wait_strategy_),
         consumed_(wait_strategy_) {
     claim_strategy_.add_claim_barrier(consumed_);
+#if defined(__ANDROID__)
+    // Android NDK's libc++ may not expose C++20 jthread/stop_token.
+    // Use an atomic stop flag and explicit join while keeping the wake-up path.
+    dispatch_thread_ = std::thread([this]() { TimerThreadMain(); });
+#else
     dispatch_thread_ =
         std::jthread([this](std::stop_token stop_token) { TimerThreadMain(stop_token); });
+#endif
   }
 
   ~TimerQueue() {
+#if defined(__ANDROID__)
+    stop_requested_.store(true, std::memory_order_release);
+#else
     dispatch_thread_.request_stop();
+#endif
 
     // Kick dispatch thread to check stop token
     auto wait_item = std::make_shared<WaitItem>(nullptr, nullptr, this, clock::time_point::min(),
@@ -52,10 +64,21 @@ class TimerQueue {
     wait_item->Disarm();
     QueueTimer(std::move(wait_item));
 
-    // std::jthread auto-joins on destruction
+#if defined(__ANDROID__)
+    // The wake-up timer above breaks wait_until_published so join can finish.
+    if (dispatch_thread_.joinable()) {
+      dispatch_thread_.join();
+    }
+#else
+    // std::jthread auto-joins on destruction.
+#endif
   }
 
+#if defined(__ANDROID__)
+  void TimerThreadMain() {
+#else
   void TimerThreadMain(std::stop_token stop_token) {
+#endif
     dp::sequence_t next_sequence = 0;
     const auto comp = [](const std::shared_ptr<WaitItem>& left,
                          const std::shared_ptr<WaitItem>& right) {
@@ -64,7 +87,11 @@ class TimerQueue {
 
     set_current_thread_name("rex::thread::TimerQueue");
 
+#if defined(__ANDROID__)
+    while (!stop_requested_.load(std::memory_order_acquire)) {
+#else
     while (!stop_token.stop_requested()) {
+#endif
       {
         // Consume new wait items and add them to sorted wait queue
         dp::sequence_t available = claim_strategy_.wait_until_published(
@@ -136,7 +163,7 @@ class TimerQueue {
     return wait_item_weak;
   }
 
-  std::jthread::id dispatch_thread_id() const { return dispatch_thread_.get_id(); }
+  std::thread::id dispatch_thread_id() const { return dispatch_thread_.get_id(); }
 
  private:
   // This ring buffer will be used to introduce timers queued by the public API
@@ -149,7 +176,12 @@ class TimerQueue {
   // This is a _sorted_ (ascending due_) list of active timers managed by a
   // dedicated thread
   std::forward_list<std::shared_ptr<WaitItem>> wait_queue_;
+#if defined(__ANDROID__)
+  std::atomic<bool> stop_requested_{false};
+  std::thread dispatch_thread_;
+#else
   std::jthread dispatch_thread_;
+#endif
 };
 
 rex::thread::TimerQueue timer_queue_;
