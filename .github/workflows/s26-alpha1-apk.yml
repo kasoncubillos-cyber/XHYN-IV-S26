@@ -21,7 +21,7 @@ permissions:
 
 concurrency:
   group: s26-alpha1-android-build
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   apk:
@@ -89,7 +89,7 @@ jobs:
       - name: Build ARM64 game/runtime and installer
         env:
           BUILD_TYPE: Release
-        run: bash os/android/scripts/build_native.sh 1
+        run: bash os/android/scripts/build_native.sh 2
 
       - name: Build Android Vulkan driver proxy
         run: bash os/android/scripts/build_driver_proxy.sh
