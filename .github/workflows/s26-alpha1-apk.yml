@@ -11,6 +11,7 @@ on:
       - os/android/scripts/env.sh
       - glue/rexglue-sdk-main/src/kernel/crt/**
       - glue/rexglue-sdk-main/src/core/timer_queue.cpp
+      - glue/rexglue-sdk-main/src/kernel/xam/xam_info.cpp
       - os/android/app/src/main/java/com/libertyrecomp/**
       - os/android/app/src/test/java/com/libertyrecomp/**
   workflow_dispatch:
