@@ -41,7 +41,7 @@ int main() {
   }
 }
 #else
-TEST_CASE("All cheats visible from first phone menu", "[gta4-phone-cheats]") {
+TEST_CASE("Phone cheat catalogue has complete unique identifiers", "[gta4-phone-cheats]") {
   VerifyPhoneCheatCatalog();
 }
 #endif
