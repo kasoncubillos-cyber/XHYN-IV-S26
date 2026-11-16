@@ -15,7 +15,8 @@ public class S26GraphicsProfilesTest {
                 S26GraphicsProfiles.BALANCED,
                 S26GraphicsProfiles.HIGH,
                 S26GraphicsProfiles.MAX_EXPERIMENTAL,
-                S26GraphicsProfiles.ULTRA_VISUAL}) {
+                S26GraphicsProfiles.ULTRA_VISUAL,
+                S26GraphicsProfiles.POLICE_LIGHTS_TRAFFIC}) {
             Map<String,String> settings = new LinkedHashMap<>();
             settings.put("unrelated_setting","keep_me");
             S26GraphicsProfiles.apply(settings,profile);
@@ -31,10 +32,35 @@ public class S26GraphicsProfilesTest {
     @Test public void presetsPreservePreviouslySelected60Fps() {
         Map<String,String> settings=new LinkedHashMap<>();
         settings.put("gta4_frame_limit","60");
-        for(String profile:new String[]{S26GraphicsProfiles.BALANCED,S26GraphicsProfiles.HIGH,S26GraphicsProfiles.MAX_EXPERIMENTAL,S26GraphicsProfiles.ULTRA_VISUAL}){
+        for(String profile:new String[]{S26GraphicsProfiles.BALANCED,S26GraphicsProfiles.HIGH,S26GraphicsProfiles.MAX_EXPERIMENTAL,S26GraphicsProfiles.ULTRA_VISUAL,S26GraphicsProfiles.POLICE_LIGHTS_TRAFFIC}){
             S26GraphicsProfiles.apply(settings,profile);
             assertEquals("60",settings.get("gta4_frame_limit"));
         }
+    }
+
+    @Test public void policeLightTrafficUsesUltraSpatialQualityWithFewerReflectionUpdates() {
+        Map<String,String> ultra=new LinkedHashMap<>(), pursuit=new LinkedHashMap<>();
+        ultra.put("gta4_frame_limit","60");
+        pursuit.put("gta4_frame_limit","60");
+        S26GraphicsProfiles.apply(ultra,S26GraphicsProfiles.ULTRA_VISUAL);
+        S26GraphicsProfiles.apply(pursuit,S26GraphicsProfiles.POLICE_LIGHTS_TRAFFIC);
+        for(String key:new String[]{
+                "resolution","gta4_native_upscaler","gta4_native_anti_aliasing",
+                "gta4_native_smaa_quality","gta4_shadow_map_base_size",
+                "gta4_shadow_distance_scale","gta4_reflection_resolution",
+                "gta4_water_reflection_resolution","gta4_mirror_reflection_resolution",
+                "gta4_reflection_aa","gta4_reflection_capture_distance",
+                "gta4_draw_distance_scale"})
+            assertEquals(key,ultra.get(key),pursuit.get(key));
+        assertEquals("60",pursuit.get("gta4_frame_limit"));
+        assertEquals("2",pursuit.get("gta4_native_environment_reflection_interval"));
+        assertEquals("1",pursuit.get("gta4_native_water_reflection_interval"));
+        assertEquals("2",pursuit.get("gta4_native_pipeline_workers"));
+        assertEquals("10",pursuit.get("gta4_native_startup_prepare_seconds"));
+        assertEquals("true",pursuit.get("gta4_native_converted_texture_disk_cache"));
+        assertEquals("true",pursuit.get("gta4_native_pipeline_prewarm"));
+        assertEquals("true",pursuit.get("gta4_native_pipeline_lookahead"));
+        assertEquals("true",pursuit.get("android_thermal_guard"));
     }
 
     @Test public void ultraVisualEnablesReflectionCaptures() {
