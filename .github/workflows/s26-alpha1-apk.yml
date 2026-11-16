@@ -17,7 +17,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: s26-alpha1-android-build
@@ -113,6 +113,28 @@ jobs:
             --output out/XHYN-IV-S26-Alpha1-signed.apk
           sha256sum out/XHYN-IV-S26-Alpha1-signed.apk | tee out/XHYN-IV-S26-Alpha1-SHA256.txt
           rm -f "$RUNNER_TEMP/s26-alpha1.p12" "$RUNNER_TEMP/s26-pass.txt"
+
+      - name: Publish verified installable APK as an experimental prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          APK="out/XHYN-IV-S26-Alpha1-signed.apk"
+          test -s "$APK"
+          # GitHub Releases serves the raw .apk directly (no artifact ZIP).
+          # The release contains only the compiled port, never the GTA IV ISO.
+          if gh release view "s26-alpha1" >/dev/null 2>&1; then
+            gh release upload "s26-alpha1" "$APK" --clobber
+          else
+            gh release create "s26-alpha1" "$APK" \
+              --target "$GITHUB_SHA" \
+              --title "XHYN IV S26 Alpha 1 — experimental" \
+              --prerelease \
+              --notes "Experimental signed ARM64 APK for Samsung Galaxy S26. Source branch: feature/s26-alpha1-memory-fix. Contains no GTA IV ISO or update files. Game stability and Spanish language support have NOT yet been validated on-device. Install as a separate application (com.kasoncubillos.xhynivs26). Do not uninstall your existing XHYN IV install. For diagnostics, use Play with logs."
+          fi
+          printf 'Direct APK: %s\n' \
+            "https://github.com/$GITHUB_REPOSITORY/releases/download/s26-alpha1/XHYN-IV-S26-Alpha1-signed.apk" \
+            >> "$GITHUB_STEP_SUMMARY"
 
       - name: Preserve signed APK for personal testing
         uses: actions/upload-artifact@v4
