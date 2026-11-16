@@ -114,6 +114,17 @@ jobs:
           sha256sum out/XHYN-IV-S26-Alpha1-signed.apk | tee out/XHYN-IV-S26-Alpha1-SHA256.txt
           rm -f "$RUNNER_TEMP/s26-alpha1.p12" "$RUNNER_TEMP/s26-pass.txt"
 
+      - name: Preserve signed APK for personal testing
+        uses: actions/upload-artifact@v4
+        with:
+          name: XHYN-IV-S26-Alpha1-signed
+          path: |
+            out/XHYN-IV-S26-Alpha1-signed.apk
+            out/XHYN-IV-S26-Alpha1-SHA256.txt
+          retention-days: 7
+          if-no-files-found: error
+          compression-level: 0
+
       - name: Publish verified installable APK as an experimental prerelease
         env:
           GH_TOKEN: ${{ github.token }}
@@ -136,13 +147,3 @@ jobs:
             "https://github.com/$GITHUB_REPOSITORY/releases/download/s26-alpha1/XHYN-IV-S26-Alpha1-signed.apk" \
             >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Preserve signed APK for personal testing
-        uses: actions/upload-artifact@v4
-        with:
-          name: XHYN-IV-S26-Alpha1-signed
-          path: |
-            out/XHYN-IV-S26-Alpha1-signed.apk
-            out/XHYN-IV-S26-Alpha1-SHA256.txt
-          retention-days: 7
-          if-no-files-found: error
-          compression-level: 0
