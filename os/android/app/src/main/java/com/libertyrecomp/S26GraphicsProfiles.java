@@ -14,9 +14,10 @@ final class S26GraphicsProfiles {
     static final String POLICE_LIGHTS_TRAFFIC = "police_lights_traffic";
     static final String ULTRA_DRIVING = "ultra_driving";
     static final String SUSTAINED_60 = "sustained_60";
+    static final String SUSTAINED_60_CITY = "sustained_60_city";
 
     static void apply(Map<String,String> values, String profile) {
-        if (!BALANCED.equals(profile) && !HIGH.equals(profile) && !MAX_EXPERIMENTAL.equals(profile) && !ULTRA_VISUAL.equals(profile) && !POLICE_LIGHTS_TRAFFIC.equals(profile) && !ULTRA_DRIVING.equals(profile) && !SUSTAINED_60.equals(profile))
+        if (!BALANCED.equals(profile) && !HIGH.equals(profile) && !MAX_EXPERIMENTAL.equals(profile) && !ULTRA_VISUAL.equals(profile) && !POLICE_LIGHTS_TRAFFIC.equals(profile) && !ULTRA_DRIVING.equals(profile) && !SUSTAINED_60.equals(profile) && !SUSTAINED_60_CITY.equals(profile))
             throw new IllegalArgumentException("Unknown S26 graphics profile: " + profile);
 
         // Never overwrite a frame cap the player has already tested successfully.
@@ -171,6 +172,13 @@ final class S26GraphicsProfiles {
                 values.put("gta4_native_max_queued_frames", "3");
                 values.put("android_gpu_turbo", "false");
                 values.put("android_thermal_guard", "true");
+                break;
+            case SUSTAINED_60_CITY:
+                // Keep the proven cooler 60-FPS settings of v101, with a small
+                // improvement to distant building visibility during fast driving.
+                // The adaptive draw distance may still reduce it under load.
+                apply(values, SUSTAINED_60);
+                values.put("gta4_draw_distance_scale", "1.05");
                 break;
             default: throw new AssertionError(profile);
         }

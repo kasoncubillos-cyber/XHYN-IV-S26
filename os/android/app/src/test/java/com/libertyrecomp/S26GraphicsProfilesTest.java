@@ -61,6 +61,22 @@ public class S26GraphicsProfilesTest {
         assertEquals("keep_me",settings.get("unrelated_setting"));
     }
 
+    @Test public void cityVisibleProfileRetainsProvenV101SettingsExceptDrawDistance() {
+        Map<String,String> stable=new LinkedHashMap<>(), city=new LinkedHashMap<>();
+        stable.put("other_key", "keep_me");
+        city.put("other_key", "keep_me");
+        S26GraphicsProfiles.apply(stable,S26GraphicsProfiles.SUSTAINED_60);
+        S26GraphicsProfiles.apply(city,S26GraphicsProfiles.SUSTAINED_60_CITY);
+        assertEquals("0.9",stable.get("gta4_draw_distance_scale"));
+        assertEquals("1.05",city.get("gta4_draw_distance_scale"));
+        stable.remove("gta4_draw_distance_scale");
+        city.remove("gta4_draw_distance_scale");
+        assertEquals(stable,city);
+        assertEquals("60",city.get("gta4_frame_limit"));
+        assertEquals("true",city.get("gta4_dynamic_draw_distance"));
+        assertEquals("true",city.get("android_thermal_guard"));
+    }
+
     @Test public void sustained60RemainsOptInAndOldUltraStaysNative() {
         Map<String,String> ultra=new LinkedHashMap<>();
         S26GraphicsProfiles.apply(ultra,S26GraphicsProfiles.ULTRA_DRIVING);
