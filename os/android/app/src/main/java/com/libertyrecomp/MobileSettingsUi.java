@@ -197,6 +197,15 @@ final class MobileSettingsUi {
             if(selected[0].equals("Video")&&query.isEmpty()&&runtime!=null)rows.addView(ModernUi.text(a,"Active rendering: "+runtime.get("gta4_effective_upscaling"),12,ModernUi.MUTED));
             if(selected[0].equals("Overlay")&&query.isEmpty()){ModernUi.gridAction(a,rows,"Edit overlay",()->OverlayEditorUi.show(a,draft,()->{updatePending.run();render[0].run();rows.post(()->{View launch=rows.findViewWithTag("overlay-editor-launch");if(launch!=null)launch.requestFocus();});})).setTag("overlay-editor-launch");}
             if(selected[0].equals("Performance")&&query.isEmpty()&&runtime!=null)rows.addView(ModernUi.text(a,ThermalStatus.summary(runtime.get("gta4_thermal_status"),System.nanoTime(),false),12,ModernUi.ACCENT));
+            if(selected[0].equals("Graphics")&&query.isEmpty()){
+                ModernUi.gridAction(a,rows,"S26 Balanced (720p)",()->{S26GraphicsProfiles.apply(draft,S26GraphicsProfiles.BALANCED);updatePending.run();render[0].run();});
+                ModernUi.gridAction(a,rows,"S26 High Quality (900p)",()->{S26GraphicsProfiles.apply(draft,S26GraphicsProfiles.HIGH);updatePending.run();render[0].run();});
+                ModernUi.gridAction(a,rows,"S26 Max Quality (experimental)",()->ModernUi.builder(a)
+                    .setTitle("Experimental graphics")
+                    .setMessage("1080p, detailed shadows and reflections may crash or overheat this device. Test only after the Balanced and High profiles stay stable. Save settings to apply.")
+                    .setNegativeButton("Cancel",null)
+                    .setPositiveButton("Try maximum", (d,w)->{S26GraphicsProfiles.apply(draft,S26GraphicsProfiles.MAX_EXPERIMENTAL);updatePending.run();render[0].run();}).show());
+            }
             if(selected[0].equals("Performance")&&query.isEmpty())ModernUi.gridAction(a,rows,"Balanced settings",()->{draft.put("android_gpu_turbo","false");draft.put("android_thermal_guard","true");draft.put("ui_battery_refresh","true");if(sustainedSupported(a))draft.put("ui_sustained","true");draft.put("audio_low_latency","false");updatePending.run();render[0].run();});
             if(selected[0].equals("Controller")&&query.isEmpty()){ModernUi.gridAction(a,rows,"Test controller",()->ControllerTestUi.show(a));ModernUi.gridAction(a,rows,"Controller presets",()->ModernUi.choose(a,"Controller preset",new String[]{"Linear response","Reduce stick drift","Restore controller defaults"},-1,n->{if(n==0)draft.put("gamepad_response_curve","1");else if(n==1){draft.put("gamepad_left_deadzone","0.12");draft.put("gamepad_right_deadzone","0.12");}else for(Choice c:TOUCH)if(c.key.startsWith("gamepad_"))draft.put(c.key,c.initial);updatePending.run();render[0].run();}));}
             if(selected[0].equals("Touch controls")&&query.isEmpty()&&editor!=null){ModernUi.gridAction(a,rows,"Edit mobile controls",()->{if(commit.getAsBoolean()){state.scroll.put(selected[0],scroll.getScrollY());if(runtime!=null){current[0].setOnDismissListener(null);current[0].dismiss();}editor.accept(false);}});}
