@@ -79,8 +79,10 @@ inline gta4::quicksave::PhonePatch BuildCheatsPatch(
     if (starts[at] && Helper(linked, at, 4)) reset = at;
   for (size_t at = label + marker.size(); at < std::min(linked.size(), label + 256); ++at)
     if (starts[at] && Helper(linked, at, 6)) {
-      if (finish != linked.size()) throw std::runtime_error("Ambiguous cheats renderer");
       finish = at;
+      // The next switch case can contain another renderer within 256 bytes.
+      // Only the first renderer after this loop belongs to state 1035.
+      break;
     }
   if (reset == linked.size() || finish == linked.size() || reset + 10 >= label)
     throw std::runtime_error("Missing cheats menu helpers");

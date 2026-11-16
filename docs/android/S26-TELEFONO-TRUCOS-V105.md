@@ -53,7 +53,17 @@ Es evidencia de diseño, **no** una prueba binaria del SCO Xbox con el hash admi
 - Adaptador: fixture de instrucciones enlazadas **sintético**, 25 entradas,
   conservación del renderer, IDs reservados, rechazo de contratos ausentes,
   duplicados y episodio incorrecto; espera al cierre, expiración y cambio de mundo.
+- Catch2 con ASan/UBSan: 156117 aserciones del teléfono en tres casos; sin errores.
+- Núcleo PPC/CRT: 192 aserciones en 45 casos, con ASan/UBSan; correctas.
+- Sintaxis host del archivo completo de hooks: correcta.
 - Registro de hacks: 110 registros válidos.
+- Inspección adicional del SCO PC de FusionFix incluido en el repositorio:
+  decodificado localmente con RageLib/DataUtil como referencia, 52224 bytes de
+  código. El adaptador resuelve sus contratos estructurales con parámetros PC
+  temporales (helpers de 10 argumentos, menú local 1, opciones local 226).
+  La prueba detectó y corrigió el caso de renderers de estados vecinos y los
+  offsets locales cortos PUSH_S. No se añade ese perfil PC a producción ni se
+  relajan los hashes Xbox admitidos.
 
 Estos tests no demuestran que los contratos coincidan con el SCO real instalado,
 que la pantalla se renderice correctamente ni que se produzcan los 25 efectos.

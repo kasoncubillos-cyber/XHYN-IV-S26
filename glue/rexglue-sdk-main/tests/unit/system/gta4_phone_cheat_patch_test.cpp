@@ -43,6 +43,11 @@ struct Fixture {
     if (stock_offset) prefix.insert(prefix.end(), {kPushS, 38, 0, kLocal});
     else Local(prefix, 38);
     Int(prefix, 1); Int(prefix, 1); Int(prefix, 0); Branch(prefix, kCall, 0x2100);
+    // A neighboring stock switch case also renders a menu. Its renderer
+    // must not be confused with the first renderer belonging to Cheats.
+    Branch(prefix, kJump, 0x3500);
+    Local(prefix, p.menu_local); Local(prefix, p.options_local); Local(prefix, 38);
+    Int(prefix, 1); Int(prefix, 1); Int(prefix, 0); Branch(prefix, kCall, 0x2100);
     std::copy(prefix.begin(), prefix.end(), code.begin() + reset);
     prefix.clear(); Local(prefix, p.menu_local); prefix.insert(prefix.end(), {kPushS, 60, 0});
     prefix.push_back(kAdd); prefix.push_back(kRefGet); Branch(prefix, kCall, 0x5000);
