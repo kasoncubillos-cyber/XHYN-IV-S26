@@ -23,12 +23,12 @@ android {
     ndkVersion  = "29.0.14206865"
 
     defaultConfig {
-        applicationId = "com.kasoncubillos.xhynivs26b3"
+        applicationId = "com.kasoncubillos.xhynivs26stable"
         // 28: ASharedMemory (26) for guest memory and AAudio (27) for audio.
         minSdk        = 29
         targetSdk     = 35
-        versionCode = 3
-        versionName   = "0.5.9.5-s26-beta3"
+        versionCode = 104
+        versionName   = "0.5.9.10-s26-stable5"
 
         ndk {
             abiFilters += listOf("arm64-v8a")

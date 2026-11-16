@@ -198,23 +198,33 @@ final class MobileSettingsUi {
             if(selected[0].equals("Overlay")&&query.isEmpty()){ModernUi.gridAction(a,rows,"Edit overlay",()->OverlayEditorUi.show(a,draft,()->{updatePending.run();render[0].run();rows.post(()->{View launch=rows.findViewWithTag("overlay-editor-launch");if(launch!=null)launch.requestFocus();});})).setTag("overlay-editor-launch");}
             if(selected[0].equals("Performance")&&query.isEmpty()&&runtime!=null)rows.addView(ModernUi.text(a,ThermalStatus.summary(runtime.get("gta4_thermal_status"),System.nanoTime(),false),12,ModernUi.ACCENT));
             if(selected[0].equals("Graphics")&&query.isEmpty()){
-                ModernUi.gridAction(a,rows,"S26 Balanced (720p)",()->{S26GraphicsProfiles.apply(draft,S26GraphicsProfiles.BALANCED);updatePending.run();render[0].run();});
-                ModernUi.gridAction(a,rows,"S26 High Quality (900p)",()->{S26GraphicsProfiles.apply(draft,S26GraphicsProfiles.HIGH);updatePending.run();render[0].run();});
-                ModernUi.gridAction(a,rows,"S26 Max Quality (experimental)",()->ModernUi.builder(a)
-                    .setTitle("Gráficos experimentales")
-                    .setMessage("1080p, sombras y reflejos detallados. Puede producir caídas de FPS o calentamiento. Guarda y reinicia para probarlo.")
-                    .setNegativeButton("Cancel",null)
-                    .setPositiveButton("Probar máximo", (d,w)->{S26GraphicsProfiles.apply(draft,S26GraphicsProfiles.MAX_EXPERIMENTAL);updatePending.run();render[0].run();}).show());
-                ModernUi.gridAction(a,rows,"S26 Ultra Visual (experimental)",()->ModernUi.builder(a)
-                    .setTitle("Calidad Ultra visual")
-                    .setMessage("Activa reflejos completos del agua y del entorno, SMAA Ultra, sombras detalladas y mayor distancia de dibujo. Mantiene el límite actual de FPS, pero 60 FPS constantes no están garantizados. Puede calentar el teléfono o bajar el rendimiento. Guarda y reinicia para probarlo.")
+                // Show the latest player-tested profiles first; keep old profiles usable in code,
+                // but remove their redundant one-tap tiles from this launcher.
+                ModernUi.gridAction(a,rows,"S26 60 FPS ciudad visible",()->ModernUi.builder(a)
+                    .setTitle("60 FPS · Ciudad más visible")
+                    .setMessage("Versión experimental del perfil 60 FPS sostenidos para reducir la aparición tardía de edificios al conducir rápido. Mantiene 1080p de salida, FSR 1 Ultra Quality, SMAA Alto, protección térmica y límite de 60 FPS. Aumenta solo la distancia de dibujado de 0,90× a 1,05×; exige algo más de CPU/GPU y podría causar nuevas caídas si el teléfono se calienta. Mantiene la distancia adaptable, que puede reducir el detalle lejano bajo carga. Guarda y reinicia, y compara con el perfil anterior.")
                     .setNegativeButton("Cancelar",null)
-                    .setPositiveButton("Probar Ultra",(d,w)->{S26GraphicsProfiles.apply(draft,S26GraphicsProfiles.ULTRA_VISUAL);updatePending.run();render[0].run();}).show());
+                    .setPositiveButton("Probar ciudad visible",(d,w)->{S26GraphicsProfiles.apply(draft,S26GraphicsProfiles.SUSTAINED_60_CITY);updatePending.run();render[0].run();}).show());
+                ModernUi.gridAction(a,rows,"S26 60 FPS sostenidos",()->ModernUi.builder(a)
+                    .setTitle("Objetivo: 60 FPS")
+                    .setMessage("Prioriza 60 FPS durante sesiones largas, persecuciones y conducción rápida. Conserva salida a 1080p, pero usa FSR 1 Ultra Quality (menos píxeles internos y una pequeña pérdida de nitidez frente a nativo), SMAA Alto y sombras de 512. Reduce la frecuencia de reflejos y el escenario lejano para limitar el calentamiento. Mantiene el límite de 60 FPS, pero no garantiza alcanzarlos si la CPU/GPU se ralentiza por temperatura. No desactiva las protecciones del teléfono. Guarda los cambios y reinicia.")
+                    .setNegativeButton("Cancelar",null)
+                    .setPositiveButton("Seleccionar 60 FPS",(d,w)->{S26GraphicsProfiles.apply(draft,S26GraphicsProfiles.SUSTAINED_60);updatePending.run();render[0].run();}).show());
+                ModernUi.gridAction(a,rows,"S26 Ultra conducción fluida",()->ModernUi.builder(a)
+                    .setTitle("Ultra conducción fluida")
+                    .setMessage("Pensado para recorrer Liberty City rápidamente y sesiones prolongadas. Mantiene 1080p nativos, SMAA Ultra y sombras de alta calidad; limita algo el escenario lejano (1,2× en vez de 1,4×) y actualiza los reflejos cada dos fotogramas para reducir carga. Activa caché y preparación de efectos, desactiva GPU Turbo, conserva la protección térmica y el límite de FPS seleccionado. No garantiza mantener 60 FPS si el teléfono se calienta.")
+                    .setNegativeButton("Cancelar",null)
+                    .setPositiveButton("Seleccionar perfil",(d,w)->{S26GraphicsProfiles.apply(draft,S26GraphicsProfiles.ULTRA_DRIVING);updatePending.run();render[0].run();}).show());
                 ModernUi.gridAction(a,rows,"S26 Luces y tráfico",()->ModernUi.builder(a)
                     .setTitle("Perfil: luces policiales y tráfico")
                     .setMessage("Para persecuciones con sirenas, destellos y muchos autos. Conserva 1080p nativo, SMAA Ultra, sombras 1024 y reflejos completos. Prepara gráficos con 2 hilos, caché y 10 segundos al inicio. Los reflejos del entorno se actualizan cada 2 fotogramas (en lugar de cada 1), lo que puede reducir tirones pero suaviza algo menos el movimiento de los reflejos. Respeta tu límite actual de FPS y mantiene la protección térmica. Guarda y reinicia; no garantiza 60 FPS constantes.")
                     .setNegativeButton("Cancelar",null)
                     .setPositiveButton("Seleccionar perfil",(d,w)->{S26GraphicsProfiles.apply(draft,S26GraphicsProfiles.POLICE_LIGHTS_TRAFFIC);updatePending.run();render[0].run();}).show());
+                ModernUi.gridAction(a,rows,"S26 Ultra Visual (experimental)",()->ModernUi.builder(a)
+                    .setTitle("Calidad Ultra visual")
+                    .setMessage("Activa reflejos completos del agua y del entorno, SMAA Ultra, sombras detalladas y mayor distancia de dibujo. Mantiene el límite actual de FPS, pero 60 FPS constantes no están garantizados. Puede calentar el teléfono o bajar el rendimiento. Guarda y reinicia para probarlo.")
+                    .setNegativeButton("Cancelar",null)
+                    .setPositiveButton("Probar Ultra",(d,w)->{S26GraphicsProfiles.apply(draft,S26GraphicsProfiles.ULTRA_VISUAL);updatePending.run();render[0].run();}).show());
             }
             if(selected[0].equals("Performance")&&query.isEmpty())ModernUi.gridAction(a,rows,"Balanced settings",()->{draft.put("android_gpu_turbo","false");draft.put("android_thermal_guard","true");draft.put("ui_battery_refresh","true");if(sustainedSupported(a))draft.put("ui_sustained","true");draft.put("audio_low_latency","false");updatePending.run();render[0].run();});
             if(selected[0].equals("Controller")&&query.isEmpty()){ModernUi.gridAction(a,rows,"Test controller",()->ControllerTestUi.show(a));ModernUi.gridAction(a,rows,"Controller presets",()->ModernUi.choose(a,"Controller preset",new String[]{"Linear response","Reduce stick drift","Restore controller defaults"},-1,n->{if(n==0)draft.put("gamepad_response_curve","1");else if(n==1){draft.put("gamepad_left_deadzone","0.12");draft.put("gamepad_right_deadzone","0.12");}else for(Choice c:TOUCH)if(c.key.startsWith("gamepad_"))draft.put(c.key,c.initial);updatePending.run();render[0].run();}));}
