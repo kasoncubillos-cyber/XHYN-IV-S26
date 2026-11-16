@@ -62,7 +62,7 @@ final class ModernUi {
         states.addState(new int[]{android.R.attr.state_focused},focus);states.addState(new int[]{},surface(a,color,10));view.setBackground(states);view.setFocusable(true);
     }
     static GradientDrawable surface(Activity a,int color,int radius){GradientDrawable d=new GradientDrawable();d.setColor(color);d.setCornerRadius(dp(a,radius));return d;}
-    static TextView text(Activity a,String value,int size,int color){TextView t=new TextView(a);t.setText(value);t.setTextSize(size);t.setTextColor(color);t.setTypeface(Typeface.create("sans-serif-condensed",Typeface.NORMAL));return t;}
+    static TextView text(Activity a,String value,int size,int color){TextView t=new TextView(a);t.setText(EsUi.t(value));t.setTextSize(size);t.setTextColor(color);t.setTypeface(Typeface.create("sans-serif-condensed",Typeface.NORMAL));return t;}
     static boolean motion(android.content.Context a){return ValueAnimator.areAnimatorsEnabled()&&!UiPreferences.get(a,"reduce_motion");}
     static void enter(Activity a,View view,int delay){
         view.animate().cancel();view.setTranslationX(0);view.setTranslationY(0);
@@ -85,16 +85,16 @@ final class ModernUi {
                 if(getWindowToken()!=null){setScaleX(1);setScaleY(1);}
             }
             @Override protected void onDetachedFromWindow(){animate().cancel();super.onDetachedFromWindow();}
-        };b.setText(title);b.setFocusable(true);b.setAllCaps(false);b.setTextSize(14);b.setTypeface(Typeface.create("sans-serif-medium",Typeface.NORMAL));
+        };b.setText(EsUi.t(title));b.setFocusable(true);b.setAllCaps(false);b.setTextSize(14);b.setTypeface(Typeface.create("sans-serif-medium",Typeface.NORMAL));
         b.setMinWidth(0);b.setMinimumWidth(0);b.setMinHeight(0);b.setMinimumHeight(0);b.setIncludeFontPadding(false);b.setGravity(Gravity.CENTER);b.setSingleLine(true);b.setEllipsize(android.text.TextUtils.TruncateAt.END);
         b.setTextColor(new ColorStateList(new int[][]{new int[]{-android.R.attr.state_enabled},new int[]{android.R.attr.state_focused},new int[]{android.R.attr.state_pressed},new int[]{}},new int[]{MUTED,BG,BG,primary?BG:TEXT}));
         StateListDrawable states=new StateListDrawable();states.addState(new int[]{android.R.attr.state_pressed},surface(a,ACCENT,10));states.addState(new int[]{android.R.attr.state_focused},surface(a,ACCENT,10));states.addState(new int[]{},surface(a,primary?TEXT:0xff242424,10));
         states.setEnterFadeDuration(motion(a)?80:0);states.setExitFadeDuration(motion(a)?100:0);
-        b.setTooltipText(title);b.setBackgroundTintList(null);b.setBackground(states);b.setStateListAnimator(null);b.setElevation(0);b.setPadding(dp(a,12),dp(a,4),dp(a,12),dp(a,4));return b;
+        b.setTooltipText(EsUi.t(title));b.setBackgroundTintList(null);b.setBackground(states);b.setStateListAnimator(null);b.setElevation(0);b.setPadding(dp(a,12),dp(a,4),dp(a,12),dp(a,4));return b;
     }
     static void selected(Button button,boolean selected){button.setSelected(selected);button.setTextColor(new ColorStateList(new int[][]{new int[]{-android.R.attr.state_enabled},new int[]{android.R.attr.state_focused},new int[]{android.R.attr.state_pressed},new int[]{}},new int[]{MUTED,BG,BG,selected?ACCENT:TEXT}));}
     static Button icon(Activity a,String title,String glyph,boolean primary){Button b=button(a,title,primary);UiIcon icon=new UiIcon(glyph,primary?BG:TEXT);int size=dp(a,19);icon.setBounds(0,0,size,size);b.setCompoundDrawables(icon,null,null,null);b.setCompoundDrawablePadding(dp(a,9));return b;}
-    static Button iconButton(Activity a,String glyph,String description){Button b=button(a,"",false);UiIcon icon=new UiIcon(glyph,TEXT);int size=dp(a,20);icon.setBounds(0,0,size,size);b.setCompoundDrawables(null,null,null,null);b.setBackground(new android.graphics.drawable.LayerDrawable(new Drawable[]{b.getBackground(),icon}));android.graphics.drawable.LayerDrawable layer=(android.graphics.drawable.LayerDrawable)b.getBackground();layer.setLayerGravity(1,Gravity.CENTER);layer.setLayerSize(1,size,size);b.setContentDescription(description);b.setTooltipText(description);return b;}
+    static Button iconButton(Activity a,String glyph,String description){Button b=button(a,"",false);UiIcon icon=new UiIcon(glyph,TEXT);int size=dp(a,20);icon.setBounds(0,0,size,size);b.setCompoundDrawables(null,null,null,null);b.setBackground(new android.graphics.drawable.LayerDrawable(new Drawable[]{b.getBackground(),icon}));android.graphics.drawable.LayerDrawable layer=(android.graphics.drawable.LayerDrawable)b.getBackground();layer.setLayerGravity(1,Gravity.CENTER);layer.setLayerSize(1,size,size);b.setContentDescription(EsUi.t(description));b.setTooltipText(EsUi.t(description));return b;}
     static void action(Activity a,LinearLayout panel,String title,Runnable run){Button b=button(a,title,false);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,dp(a,42));lp.topMargin=dp(a,6);panel.addView(b,lp);b.setOnClickListener(v->run.run());}
     static Button gridAction(Activity a,LinearLayout grid,String title,Runnable run){
         View last=grid.getChildCount()==0?null:grid.getChildAt(grid.getChildCount()-1);
@@ -155,8 +155,26 @@ final class ModernUi {
     /** Keep confirmation and input dialogs navigable with the same controller rules. */
     static AlertDialog.Builder builder(Activity a){return new AlertDialog.Builder(a){
         private CharSequence heading;
-        @Override public AlertDialog.Builder setTitle(CharSequence title){heading=title;return super.setTitle(title);}
+        @Override public AlertDialog.Builder setTitle(CharSequence title){heading=title==null?null:EsUi.t(title.toString());return super.setTitle(heading);}
         @Override public AlertDialog.Builder setTitle(int title){return setTitle(a.getText(title));}
+        @Override public AlertDialog.Builder setMessage(CharSequence value){
+            return super.setMessage(value==null?null:EsUi.t(value.toString()));
+        }
+        @Override public AlertDialog.Builder setPositiveButton(CharSequence value,android.content.DialogInterface.OnClickListener action){
+            return super.setPositiveButton(value==null?null:EsUi.t(value.toString()),action);
+        }
+        @Override public AlertDialog.Builder setNegativeButton(CharSequence value,android.content.DialogInterface.OnClickListener action){
+            return super.setNegativeButton(value==null?null:EsUi.t(value.toString()),action);
+        }
+        @Override public AlertDialog.Builder setNeutralButton(CharSequence value,android.content.DialogInterface.OnClickListener action){
+            return super.setNeutralButton(value==null?null:EsUi.t(value.toString()),action);
+        }
+        @Override public AlertDialog.Builder setItems(CharSequence[] items,android.content.DialogInterface.OnClickListener action){
+            if(items==null)return super.setItems((CharSequence[])null,action);
+            CharSequence[] translated=new CharSequence[items.length];
+            for(int i=0;i<items.length;i++)translated[i]=EsUi.t(items[i].toString());
+            return super.setItems(translated,action);
+        }
         @Override public AlertDialog create(){
             if(heading!=null){TextView title=text(a,heading.toString(),17,TEXT);title.setTypeface(Typeface.create("sans-serif-medium",Typeface.NORMAL));title.setPadding(dp(a,18),dp(a,14),dp(a,18),dp(a,4));setCustomTitle(title);}
             AlertDialog dialog=super.create();if(heading!=null)dialog.setTitle(heading);ControllerNavigation navigation=new ControllerNavigation();
