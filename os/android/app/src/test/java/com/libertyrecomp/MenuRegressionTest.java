@@ -129,6 +129,24 @@ public class MenuRegressionTest {
             menu.dismiss();
         }
     }
+    @Test public void modMenuShowsRealOfflineCheatsInSpanish() {
+        try(ActivityController<Activity> c=Robolectric.buildActivity(Activity.class).setup()) {
+            Activity a=c.get();
+            MobileSettingsUi.Runtime runtime=new MobileSettingsUi.Runtime(){
+                public String get(String key){return "";}
+                public boolean apply(String[] keys,String[] values){return true;}
+            };
+            int[] requested={-1};boolean[] resumed={false};
+            AlertDialog dialog=CheatsUi.show(a,runtime,id->{requested[0]=id;return true;},()->resumed[0]=true);
+            assertNotNull(find(dialog.getWindow().getDecorView(),"Añadir $10.000"));
+            assertNotNull(find(dialog.getWindow().getDecorView(),"Activar inmortalidad"));
+            assertNotNull(find(dialog.getWindow().getDecorView(),"Generar Turismo"));
+            click(dialog.getWindow().getDecorView(),"Añadir $10.000");
+            assertEquals(103,requested[0]);
+            assertTrue(resumed[0]);
+        }
+    }
+
     @Test public void choicesKeepScrollAndSavedPendingSettings()throws Exception{
         try(ActivityController<Activity> c=Robolectric.buildActivity(Activity.class).setup()){
             Activity a=c.get();File data=data(a);MobileConfig.update(MobileConfig.file(data),Map.of("gta4_frame_limit","30"));PendingSettings.save(data,Map.of("resolution","540p"));
