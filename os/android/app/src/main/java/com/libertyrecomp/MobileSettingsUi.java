@@ -210,7 +210,7 @@ final class MobileSettingsUi {
                     .setMessage("Activa reflejos completos del agua y del entorno, SMAA Ultra, sombras detalladas y mayor distancia de dibujo. Mantiene el límite actual de FPS, pero 60 FPS constantes no están garantizados. Puede calentar el teléfono o bajar el rendimiento. Guarda y reinicia para probarlo.")
                     .setNegativeButton("Cancelar",null)
                     .setPositiveButton("Probar Ultra",(d,w)->{S26GraphicsProfiles.apply(draft,S26GraphicsProfiles.ULTRA_VISUAL);updatePending.run();render[0].run();}).show());
-                ModernUi.gridAction(a,rows,"S26 Luces y tráfico (60 FPS)",()->ModernUi.builder(a)
+                ModernUi.gridAction(a,rows,"S26 Luces y tráfico",()->ModernUi.builder(a)
                     .setTitle("Perfil: luces policiales y tráfico")
                     .setMessage("Para persecuciones con sirenas, destellos y muchos autos. Conserva 1080p nativo, SMAA Ultra, sombras 1024 y reflejos completos. Prepara gráficos con 2 hilos, caché y 10 segundos al inicio. Los reflejos del entorno se actualizan cada 2 fotogramas (en lugar de cada 1), lo que puede reducir tirones pero suaviza algo menos el movimiento de los reflejos. Respeta tu límite actual de FPS y mantiene la protección térmica. Guarda y reinicia; no garantiza 60 FPS constantes.")
                     .setNegativeButton("Cancelar",null)
