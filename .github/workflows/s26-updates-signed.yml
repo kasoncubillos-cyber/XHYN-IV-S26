@@ -1,0 +1,164 @@
+name: S26 Actualizaciones Firmadas
+
+on:
+  push:
+    branches:
+      - feature/s26-conduccion-fluida-updates
+    paths:
+      - .github/workflows/s26-updates-signed.yml
+      - os/android/app/build.gradle.kts
+      - os/android/app/src/main/res/values/**
+      - os/android/app/src/main/java/com/libertyrecomp/**
+      - os/android/app/src/test/java/com/libertyrecomp/**
+      - os/android/scripts/**
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: s26-updates-signed
+  cancel-in-progress: true
+
+jobs:
+  app:
+    name: Test and sign stable S26 update
+    runs-on: ubuntu-24.04
+    timeout-minutes: 95
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+        with:
+          submodules: false
+          persist-credentials: false
+
+      - name: Install JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Android SDK and pinned SDL3
+        uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+
+      - name: Install build tools
+        run: |
+          set -euo pipefail
+          sdkmanager --licenses >/dev/null <<<'y' || true
+          sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+          git submodule update --init glue/rexglue-sdk-main/thirdparty/sdl3
+          echo "ANDROID_SDK_ROOT=$ANDROID_HOME" >> "$GITHUB_ENV"
+
+      - name: Verify permanent app identity and version
+        id: version
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          gradle=Path('os/android/app/build.gradle.kts').read_text()
+          pkg=re.search(r'applicationId\s*=\s*"([^"]+)"',gradle).group(1)
+          code=int(re.search(r'versionCode\s*=\s*(\d+)',gradle).group(1))
+          assert pkg=='com.kasoncubillos.xhynivs26stable',pkg
+          assert code>=100,code
+          assert Path('os/android/app/src/main/java/com/libertyrecomp/S26GraphicsProfiles.java').read_text().count('ULTRA_DRIVING')>0
+          with open(__import__('os').environ['GITHUB_OUTPUT'],'a') as out:
+              out.write(f"code={code}\n")
+          PY
+
+      - name: Download and verify working Alpha1 native engine
+        run: |
+          set -euo pipefail
+          mkdir -p out
+          curl -fL --retry 3 --retry-delay 3 \
+            "https://github.com/$GITHUB_REPOSITORY/releases/download/s26-alpha1/XHYN-IV-S26-Alpha1-signed.apk" \
+            -o out/verified-native-baseline.apk
+          echo "001fc241290931c7817c9db19d3e77ec0589b8dfa34d80429646ae077c86b43b  out/verified-native-baseline.apk" | sha256sum -c -
+
+      - name: Run Android regression tests
+        working-directory: os/android
+        run: ./gradlew --no-daemon --max-workers=2 :app:testDebugUnitTest
+
+      - name: Generate aligned APK, unsigned for signing separately
+        run: |
+          set -euo pipefail
+          python3 os/android/scripts/package_release.py \
+            --native-apk out/verified-native-baseline.apk \
+            --native-apk-sha256 001fc241290931c7817c9db19d3e77ec0589b8dfa34d80429646ae077c86b43b \
+            --unsigned \
+            --output out/XHYN-IV-S26-update-unsigned.apk
+
+      - name: Check secure signing setup
+        id: signing
+        env:
+          KEYSTORE_B64: ${{ secrets.XHYN_S26_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.XHYN_S26_KEYSTORE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [ -n "$KEYSTORE_B64" ] && [ -n "$KEYSTORE_PASSWORD" ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "## APK lista para firma; falta configurar 2 secretos privados" >> "$GITHUB_STEP_SUMMARY"
+            echo "GitHub Settings → Secrets and variables → Actions: XHYN_S26_KEYSTORE_BASE64 y XHYN_S26_KEYSTORE_PASSWORD." >> "$GITHUB_STEP_SUMMARY"
+            echo "Nunca publiques el archivo PKCS12 ni su contraseña en el repositorio." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Sign with permanent key, verify package and signature
+        if: steps.signing.outputs.ready == 'true'
+        env:
+          KEYSTORE_B64: ${{ secrets.XHYN_S26_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.XHYN_S26_KEYSTORE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          KS="$RUNNER_TEMP/xhyn-s26-stable.p12"
+          PASS="$RUNNER_TEMP/xhyn-s26-stable-pass.txt"
+          trap 'rm -f "$KS" "$PASS"' EXIT
+          printf '%s' "$KEYSTORE_B64" | base64 -d > "$KS"
+          printf '%s' "$KEYSTORE_PASSWORD" > "$PASS"
+          chmod 600 "$KS" "$PASS"
+          APK="out/XHYN-IV-S26-update-v${{ steps.version.outputs.code }}.apk"
+          java -jar "$ANDROID_HOME/build-tools/35.0.0/lib/apksigner.jar" sign \
+            --ks "$KS" --ks-key-alias xhyn-s26-stable \
+            --ks-pass "file:$PASS" --v4-signing-enabled false \
+            --out "$APK" out/XHYN-IV-S26-update-unsigned.apk
+          java -jar "$ANDROID_HOME/build-tools/35.0.0/lib/apksigner.jar" verify \
+            --verbose --print-certs "$APK"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt2" dump badging "$APK" | grep "package: name='com.kasoncubillos.xhynivs26stable' versionCode='${{ steps.version.outputs.code }}'"
+          sha256sum "$APK" | tee out/XHYN-IV-S26-update-SHA256.txt
+
+      - name: Preserve signed installer
+        if: steps.signing.outputs.ready == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: S26-update-v${{ steps.version.outputs.code }}
+          path: |
+            out/XHYN-IV-S26-update-v${{ steps.version.outputs.code }}.apk
+            out/XHYN-IV-S26-update-SHA256.txt
+          retention-days: 14
+          if-no-files-found: error
+          compression-level: 0
+
+      - name: Publish direct APK update
+        if: steps.signing.outputs.ready == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          VERSION="${{ steps.version.outputs.code }}"
+          TAG="s26-update-v$VERSION"
+          APK="out/XHYN-IV-S26-update-v$VERSION.apk"
+          test -s "$APK"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "::error::Version $VERSION was published already. Bump versionCode to publish another signed update."
+            exit 1
+          fi
+          gh release create "$TAG" "$APK" \
+            --target "$GITHUB_SHA" \
+            --title "XHYN IV S26 · actualización v$VERSION" \
+            --prerelease \
+            --notes "Versión privada de pruebas con firma permanente. Misma identidad com.kasoncubillos.xhynivs26stable para próximas actualizaciones. Perfil Ultra conducción fluida. No contiene archivos comerciales de GTA IV. Esta primera versión se instala independientemente de Alpha/Beta anteriores debido a las firmas de prueba, pero las siguientes podrán instalarse encima de esta si se conserva la clave."
+          printf 'APK directa: %s\n' \
+            "https://github.com/$GITHUB_REPOSITORY/releases/download/$TAG/XHYN-IV-S26-update-v$VERSION.apk" >> "$GITHUB_STEP_SUMMARY"
