@@ -86,8 +86,8 @@ public class LauncherActivity extends Activity {
     private static final int SOURCE_TLAD = 2;
     private static final int SOURCE_TBOGT = 3;
     private static final String[] SOURCE_LABELS = {
-            "Base game (disc image .iso)", "Title Update 8", "The Lost and Damned (optional)",
-            "The Ballad of Gay Tony (optional)"};
+            "Juego base (imagen de disco .iso)", "Actualización del título 8", "The Lost and Damned (opcional)",
+            "The Ballad of Gay Tony (opcional)"};
 
     private File mDataRoot;
     private RadioGroup mDrivers;
@@ -221,8 +221,8 @@ public class LauncherActivity extends Activity {
     private View mDriverPanel,mFilesPanel;
     private TextView mLaunchSummary,mAchievementSummary;
     private String launchSummary(){
-        try{java.util.Map<String,String> c=MobileConfig.read(MobileConfig.file(mDataRoot));c.putAll(PendingSettings.read(mDataRoot));String mode=DriverState.readChoice(mDataRoot);String driver=mode.equals("auto")?"Automatic":mode.equals("system")?"System":BundledDrivers.ALL.containsKey(mode)?BundledDrivers.ALL.get(mode).label:mode.replace("custom:","");String summary=c.getOrDefault("resolution","720p")+" · Cap "+c.getOrDefault("gta4_frame_limit","30")+" FPS · "+c.getOrDefault("gta4_native_anti_aliasing","fxaa").toUpperCase(Locale.ROOT)+" / "+c.getOrDefault("gta4_native_upscaler","native")+"\n"+driver+" · Android "+Build.VERSION.RELEASE+" · "+GpuInfo.renderer();
-            if(PendingSettings.pending(mDataRoot))summary+=" · Restart pending";
+        try{java.util.Map<String,String> c=MobileConfig.read(MobileConfig.file(mDataRoot));c.putAll(PendingSettings.read(mDataRoot));String mode=DriverState.readChoice(mDataRoot);String driver=mode.equals("auto")?"Automático":mode.equals("system")?"Sistema":BundledDrivers.ALL.containsKey(mode)?BundledDrivers.ALL.get(mode).label:mode.replace("custom:","");String summary=c.getOrDefault("resolution","720p")+" · Cap "+c.getOrDefault("gta4_frame_limit","30")+" FPS · "+c.getOrDefault("gta4_native_anti_aliasing","fxaa").toUpperCase(Locale.ROOT)+" / "+c.getOrDefault("gta4_native_upscaler","native")+"\n"+driver+" · Android "+Build.VERSION.RELEASE+" · "+GpuInfo.renderer();
+            if(PendingSettings.pending(mDataRoot))summary+=" · Reinicio pendiente";
             return summary;
         }catch(Exception e){return "Configured graphics and driver apply when you play.";}
     }
@@ -290,8 +290,8 @@ public class LauncherActivity extends Activity {
     private void refreshAchievementSummary(){if(mAchievementSummary==null)return;try{
         File catalog=new File(mDataRoot,"LibertyRecomp/saves/achievements/catalog.json");if(!catalog.isFile()||catalog.length()>2*1024*1024)return;
         org.json.JSONArray entries=new JSONObject(new String(java.nio.file.Files.readAllBytes(catalog.toPath()),StandardCharsets.UTF_8)).getJSONArray("achievements");int unlocked=0;for(int i=0;i<entries.length();i++)if(entries.getJSONObject(i).optBoolean("unlocked"))unlocked++;
-        mAchievementSummary.setText(unlocked+" / "+entries.length()+" unlocked");
-    }catch(Exception ignored){mAchievementSummary.setText("Progress unavailable");}}
+        mAchievementSummary.setText(unlocked+" / "+entries.length()+" desbloqueados");
+    }catch(Exception ignored){mAchievementSummary.setText("Progreso no disponible");}}
     private void showAchievements(){
         File catalog=new File(mDataRoot,"LibertyRecomp/saves/achievements/catalog.json");
         if(!catalog.isFile()&&!gameRunning()&&!mBusy&&!Installer.running()&&Installer.installState(mDataRoot)==null){prepareAchievementCatalog();return;}
@@ -431,7 +431,7 @@ public class LauncherActivity extends Activity {
         boolean installedNow = mInstallerReady ? mInstalled
                 : installed != null && installed.length > 0;
         if (installedNow) {
-            mStatus.setText("Game installed"+observedCompletion());
+            mStatus.setText("Juego instalado"+observedCompletion());
         } else {
             File[] sources = new File(mDataRoot, "install").listFiles();
             boolean disc = false;
@@ -442,10 +442,9 @@ public class LauncherActivity extends Activity {
                 else update = true;
             }
             if (disc && update) {
-                mStatus.setText("Game files found in install/. Open Game files and press Install.");
+                mStatus.setText("Archivos detectados en install/. Abre Archivos del juego y pulsa Instalar.");
             } else {
-                mStatus.setText("Game not installed. Choose the disc image and Title Update 8 "
-                        + "in Game files and press Install.");
+                mStatus.setText("Juego no instalado. Selecciona la imagen del disco y la actualización del título 8 en Archivos del juego y pulsa Instalar.");
             }
         }
         String result = null;
@@ -460,7 +459,7 @@ public class LauncherActivity extends Activity {
             }
         } catch (IOException ignored) {
         }
-        mLastLaunch.setText(result != null ? "Last launch failed: " + result : "");
+        mLastLaunch.setText(result != null ? "Error en el último inicio: " + result : "");
         mLastLaunch.setVisibility(result != null ? View.VISIBLE : View.GONE);
     }
 
@@ -621,7 +620,7 @@ public class LauncherActivity extends Activity {
         mCancelInstall = button("Cancel", false);
         mCancelInstall.setOnClickListener(v -> {
             Installer.cancel();
-            mProgressText.setText("Cancelling...");
+            mProgressText.setText("Cancelando…");
         });
         LinearLayout.LayoutParams cancelParams = new LinearLayout.LayoutParams(dp(120), dp(52));
         cancelParams.leftMargin = dp(10);
@@ -639,8 +638,8 @@ public class LauncherActivity extends Activity {
     /** Re-reads the installation state and the install/ folder, then redraws. */
     private void refreshInstall() {
         if (!mInstallerReady) {
-            mInstallTitle.setText("Game");
-            mInstallNote.setText(Installer.loadError() == null ? "Checking the installation..."
+            mInstallTitle.setText("Juego");
+            mInstallNote.setText(Installer.loadError() == null ? "Comprobando la instalación…"
                     : "The installer is unavailable (" + Installer.loadError() + "). The game "
                     + "installs itself on Play from the install/ folder.");
             mExpand.setVisibility(View.GONE);
@@ -664,21 +663,21 @@ public class LauncherActivity extends Activity {
 
     private void updateInstallViews(String reason) {
         boolean running = Installer.running();
-        mInstallTitle.setText(mInstalled ? "Game installed" : "Install the game");
+        mInstallTitle.setText(mInstalled ? "Juego instalado" : "Instalar el juego");
         mInstallNote.setText(mInstalled
-                ? "GTA IV with Title Update 8 is installed and ready."
-                : "You need your own USA disc image and Title Update 8 (0.0.8.5)."
+                ? "GTA IV con la actualización 8 está instalado y listo."
+                : "Necesitas la imagen de disco original de EE. UU. y la actualización del título 8 (0.0.8.5)."
                         + (reason != null && !reason.equals("not installed")
                         && new File(Installer.installRoot(mDataRoot), "game").exists()
-                        ? "\nCurrent installation: " + reason : ""));
+                        ? "\nInstalación actual: " + reason : ""));
         boolean showBody = !mInstalled || mExpanded || running;
         mExpand.setVisibility(showBody ? View.GONE : View.VISIBLE);
         mInstallBody.setVisibility(showBody ? View.VISIBLE : View.GONE);
         for (int i = 0; i < SOURCE_LABELS.length; ++i) {
-            mSourceValues[i].setText(mSources[i] != null ? mSources[i] : "Not selected");
+            mSourceValues[i].setText(mSources[i] != null ? mSources[i] : "Sin seleccionar");
         }
         if (mInspecting) {
-            mInspectionText.setText("Checking the disc image...");
+            mInspectionText.setText("Comprobando imagen del disco…");
             mInspectionText.setTextColor(0xFFFFC840);
         } else if (mInspection != null && mSources[SOURCE_GAME] != null) {
             mInspectionText.setText(mInspection.summary);
@@ -694,7 +693,7 @@ public class LauncherActivity extends Activity {
         boolean canInstall = !running && !mInspecting && (gameReady || episodesOnly);
         mInstall.setEnabled(canInstall);
         mInstall.setAlpha(canInstall ? 1f : 0.4f);
-        mInstall.setText(episodesOnly ? "Install episodes" : "Install");
+        mInstall.setText(episodesOnly ? "Instalar episodios" : "Instalar");
         mCancelInstall.setVisibility(running ? View.VISIBLE : View.GONE);
         mSourceRows.setVisibility(running ? View.GONE : View.VISIBLE);
         mInstall.setVisibility(running ? View.GONE : View.VISIBLE);
@@ -1309,7 +1308,7 @@ public class LauncherActivity extends Activity {
     }
 
     private void toast(String message) {
-        android.widget.Toast.makeText(this, message, android.widget.Toast.LENGTH_LONG).show();
+        android.widget.Toast.makeText(this, EsUi.t(message), android.widget.Toast.LENGTH_LONG).show();
     }
 
     @SuppressWarnings("deprecation")
@@ -1325,7 +1324,7 @@ public class LauncherActivity extends Activity {
 
     private TextView text(String value, int sp, int colorRes) {
         TextView view = new TextView(this);
-        view.setText(value);
+        view.setText(EsUi.t(value));
         view.setTextSize(TypedValue.COMPLEX_UNIT_SP, sp);
         view.setTextColor(color(colorRes));
         return view;
