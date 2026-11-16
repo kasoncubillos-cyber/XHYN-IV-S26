@@ -9,6 +9,7 @@
  * @modified    Tom Clay, 2026 - Adapted for ReXGlue runtime
  */
 
+#include <rex/cvar.h>
 #include <rex/kernel/xam/module.h>
 #include <rex/kernel/xam/private.h>
 #include <rex/logging.h>
@@ -183,19 +184,11 @@ u32 XGetGameRegion_entry() {
 }
 
 u32 XGetLanguage_entry() {
-  auto desired_language = XLanguage::kEnglish;
-
-  // Switch the language based on game region.
-  // TODO(benvanik): pull from xex header.
-  uint32_t game_region = XEX_REGION_NTSCU;
-  if (game_region & XEX_REGION_NTSCU) {
-    desired_language = XLanguage::kEnglish;
-  } else if (game_region & XEX_REGION_NTSCJ) {
-    desired_language = XLanguage::kJapanese;
-  }
-  // Add more overrides?
-
-  return uint32_t(desired_language);
+  // Report the configured Xbox 360 language instead of forcing English for
+  // NTSC-U discs. The Android launcher writes user_language (5 = Spanish,
+  // 1 = English), and ExGetXConfigSetting reads that same cvar.
+  // Keep the configured value for other valid Xbox language IDs as well.
+  return static_cast<u32>(REXCVAR_GET(user_language));
 }
 
 u32 XamGetCurrentTitleId_entry() {
