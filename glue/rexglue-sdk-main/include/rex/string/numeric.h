@@ -11,10 +11,13 @@
 #pragma once
 
 #include <charconv>
+#include <cerrno>
 #include <cstdint>
+#include <cstdlib>
 #include <cstring>
 #include <string>
 #include <string_view>
+#include <type_traits>
 
 #include <fmt/format.h>
 
@@ -106,6 +109,33 @@ inline T ifs(const std::string_view value, bool force_hex) {
   return result;
 }
 
+// Android NDK libc++ may omit floating-point std::from_chars overloads.
+// Preserve the non-allocating std::from_chars behavior on other platforms.
+// strtof/strtod require a terminated buffer, so copy only the requested range.
+template <typename T>
+inline std::from_chars_result parse_float_chars(const char* first, const char* last, T& value) {
+#if defined(__ANDROID__)
+  if (first == last || *first == '+' || *first == ' ' || *first == '\t' ||
+      *first == '\n' || *first == '\r') {
+    return {first, std::errc::invalid_argument};
+  }
+  const std::string input(first, last);
+  char* parsed_end = nullptr;
+  errno = 0;
+  if constexpr (std::is_same_v<T, float>) {
+    value = std::strtof(input.c_str(), &parsed_end);
+  } else {
+    value = std::strtod(input.c_str(), &parsed_end);
+  }
+  const size_t consumed = static_cast<size_t>(parsed_end - input.c_str());
+  if (consumed == 0) return {first, std::errc::invalid_argument};
+  if (errno == ERANGE) return {first + consumed, std::errc::result_out_of_range};
+  return {first + consumed, std::errc{}};
+#else
+  return std::from_chars(first, last, value, std::chars_format::general);
+#endif
+}
+
 // floating_point_from_string
 template <typename T, typename PUN>
 inline T fpfs(const std::string_view value, bool force_hex) {
@@ -133,8 +163,7 @@ inline T fpfs(const std::string_view value, bool force_hex) {
     }
     std::memcpy(&result, &pun, sizeof(PUN));
   } else {
-    auto [p, error] = std::from_chars(range.data(), range.data() + range.size(), result,
-                                      std::chars_format::general);
+    auto [p, error] = parse_float_chars(range.data(), range.data() + range.size(), result);
     // TODO(gibbed): do something more with errors?
     if (error != std::errc()) {
       assert_always();
@@ -253,7 +282,7 @@ inline vec128_t from_string<vec128_t>(const std::string_view value, bool force_h
         assert_always();
         return vec128_t();
       }
-      auto result = std::from_chars(p, end, v.f32[i], std::chars_format::general);
+      auto result = detail::parse_float_chars(p, end, v.f32[i]);
       if (result.ec != std::errc()) {
         assert_always();
         return vec128_t();

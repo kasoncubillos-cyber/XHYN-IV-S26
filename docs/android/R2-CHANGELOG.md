@@ -8,6 +8,25 @@ Install it over your existing XHYN IV app. Back up saves first; uninstalling rem
 
 **Performance still needs work. Improvements will continue through future updates. No logs = no improvements.**
 
+## Unreleased Test14 — CRT memory and string lengths
+
+- Fix the reproduced CRT argument-width regression that could send an oversized length to native `memset` during gameplay. All 14 affected memory/string hooks now decode Xbox lengths and capacities as 32-bit values before calling the host C library.
+- Preserve genuine 64-bit kernel arguments and the Test13 crash captures. Add guarded production-hook regressions and a source check against host-sized CRT parameters.
+- Passed 45 core cases / 192 assertions with ASan/UBSan, 22 audit cases, 24 Android UI tests and the full ARM64 native build. Phone validation remains pending.
+
+See [Test14 evidence and validation](TEST14-VALIDATION.md). The published download
+above remains Test12 while this fix is tested on a device.
+
+## Unreleased Test13 diagnostic candidate
+
+- Add an opt-in native fatal-signal capture for instruction/fault addresses, thread IDs and current module mappings. Preserve the existing signal termination path.
+- Match crash excerpts to the current capture and read the actual tail of large logs. Include app/device metadata and distinguish unavailable memory samples.
+- Refresh exit summaries after gameplay and before export. Include matching crash reports and available raw system tombstones in the session ZIP.
+
+This candidate investigates the reported gameplay crash. A fix for the underlying
+fault has not been identified. The published download above remains Test12.
+See [diagnostic validation and capture steps](TEST13-DIAGNOSTICS.md).
+
 ## Test12 — core compatibility and title-update decoding
 
 This release includes the previously unreleased Test11 changes below and all

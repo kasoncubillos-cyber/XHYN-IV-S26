@@ -1,0 +1,151 @@
+name: S26 Alpha1 Android APK (experimental)
+
+on:
+  push:
+    branches:
+      - feature/s26-alpha1-memory-fix
+    paths:
+      - .github/workflows/s26-alpha1-apk.yml
+      - os/android/app/build.gradle.kts
+      - os/android/app/src/main/res/values/strings.xml
+      - os/android/scripts/env.sh
+      - glue/rexglue-sdk-main/src/kernel/crt/**
+      - glue/rexglue-sdk-main/src/core/timer_queue.cpp
+      - glue/rexglue-sdk-main/include/rex/string/numeric.h
+      - glue/rexglue-sdk-main/src/kernel/xam/xam_info.cpp
+      - os/android/app/src/main/java/com/libertyrecomp/**
+      - os/android/app/src/test/java/com/libertyrecomp/**
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: s26-alpha1-android-build
+  cancel-in-progress: true
+
+jobs:
+  apk:
+    name: Build and sign isolated S26 Alpha1 APK
+    runs-on: ubuntu-24.04
+    timeout-minutes: 330
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+        with:
+          submodules: false
+          persist-credentials: false
+
+      - name: Recover runner disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /opt/hostedtoolcache/CodeQL /usr/local/share/powershell
+          df -h .
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+
+      - name: Install Android SDK/NDK and CMake
+        run: |
+          sdkmanager --licenses >/dev/null <<<'y' || true
+          sdkmanager 'platforms;android-35' 'build-tools;35.0.0' 'ndk;29.0.14206865'
+          python -m pip install --disable-pip-version-check 'cmake==3.31.6' ninja
+          cmake --version
+          df -h .
+          echo "ANDROID_SDK_ROOT=$ANDROID_HOME" >> "$GITHUB_ENV"
+          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/29.0.14206865" >> "$GITHUB_ENV"
+          echo "ANDROID_NDK=$ANDROID_HOME/ndk/29.0.14206865" >> "$GITHUB_ENV"
+
+      - name: Verify independent application identity
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          gradle = Path('os/android/app/build.gradle.kts').read_text()
+          assert 'applicationId = "com.kasoncubillos.xhynivs26"' in gradle
+          assert 'versionName   = "0.5.9.3-s26-alpha1"' in gradle
+          assert 'versionCode = 1' in gradle
+          memory = Path('glue/rexglue-sdk-main/src/kernel/crt/memory.cpp').read_text()
+          assert 'native_memset(void* dst, int val, uint32_t n)' in memory
+          print('S26 separate package + Test14 CRT signatures confirmed')
+          PY
+
+      - name: Fetch pinned submodules and patches
+        run: python3 tools/setup_repo.py
+
+      - name: Validate Android S26 language and graphics preferences
+        working-directory: os/android
+        run: ./gradlew --no-daemon --max-workers=2 :app:testDebugUnitTest
+
+      - name: Build ARM64 game/runtime and installer
+        env:
+          BUILD_TYPE: Release
+        run: bash os/android/scripts/build_native.sh 2
+
+      - name: Build Android Vulkan driver proxy
+        run: bash os/android/scripts/build_driver_proxy.sh
+
+      - name: Sign with an ephemeral Alpha1 test key
+        run: |
+          set -euo pipefail
+          PASSWORD="$(openssl rand -hex 24)"
+          printf '%s' "$PASSWORD" > "$RUNNER_TEMP/s26-pass.txt"
+          chmod 600 "$RUNNER_TEMP/s26-pass.txt"
+          keytool -genkeypair -noprompt -storetype PKCS12 \
+            -keystore "$RUNNER_TEMP/s26-alpha1.p12" \
+            -alias s26-alpha1 -keyalg RSA -keysize 3072 -validity 365 \
+            -storepass "$PASSWORD" -keypass "$PASSWORD" \
+            -dname "CN=XHYN IV S26 Alpha1 experimental, O=Personal Test, C=CL"
+          unset PASSWORD
+          python3 os/android/scripts/package_release.py \
+            --keystore "$RUNNER_TEMP/s26-alpha1.p12" \
+            --password-file "$RUNNER_TEMP/s26-pass.txt" \
+            --alias s26-alpha1 \
+            --output out/XHYN-IV-S26-Alpha1-signed.apk
+          sha256sum out/XHYN-IV-S26-Alpha1-signed.apk | tee out/XHYN-IV-S26-Alpha1-SHA256.txt
+          rm -f "$RUNNER_TEMP/s26-alpha1.p12" "$RUNNER_TEMP/s26-pass.txt"
+
+      - name: Preserve signed APK for personal testing
+        uses: actions/upload-artifact@v4
+        with:
+          name: XHYN-IV-S26-Alpha1-signed
+          path: |
+            out/XHYN-IV-S26-Alpha1-signed.apk
+            out/XHYN-IV-S26-Alpha1-SHA256.txt
+          retention-days: 7
+          if-no-files-found: error
+          compression-level: 0
+
+      - name: Publish verified installable APK as an experimental prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          APK="out/XHYN-IV-S26-Alpha1-signed.apk"
+          test -s "$APK"
+          # GitHub Releases serves the raw .apk directly (no artifact ZIP).
+          # The release contains only the compiled port, never the GTA IV ISO.
+          if gh release view "s26-alpha1" >/dev/null 2>&1; then
+            gh release upload "s26-alpha1" "$APK" --clobber
+          else
+            gh release create "s26-alpha1" "$APK" \
+              --target "$GITHUB_SHA" \
+              --title "XHYN IV S26 Alpha 1 — experimental" \
+              --prerelease \
+              --notes "Experimental signed ARM64 APK for Samsung Galaxy S26. Source branch: feature/s26-alpha1-memory-fix. Contains no GTA IV ISO or update files. Game stability and Spanish language support have NOT yet been validated on-device. Install as a separate application (com.kasoncubillos.xhynivs26). Do not uninstall your existing XHYN IV install. For diagnostics, use Play with logs."
+          fi
+          printf 'Direct APK: %s\n' \
+            "https://github.com/$GITHUB_REPOSITORY/releases/download/s26-alpha1/XHYN-IV-S26-Alpha1-signed.apk" \
+            >> "$GITHUB_STEP_SUMMARY"
+
