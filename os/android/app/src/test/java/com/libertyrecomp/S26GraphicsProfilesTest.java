@@ -14,7 +14,8 @@ public class S26GraphicsProfilesTest {
         for (String profile : new String[] {
                 S26GraphicsProfiles.BALANCED,
                 S26GraphicsProfiles.HIGH,
-                S26GraphicsProfiles.MAX_EXPERIMENTAL}) {
+                S26GraphicsProfiles.MAX_EXPERIMENTAL,
+                S26GraphicsProfiles.ULTRA_VISUAL}) {
             Map<String,String> settings = new LinkedHashMap<>();
             settings.put("unrelated_setting","keep_me");
             S26GraphicsProfiles.apply(settings,profile);
@@ -25,6 +26,26 @@ public class S26GraphicsProfilesTest {
             assertTrue(settings.containsKey("gta4_shadow_map_base_size"));
             assertTrue(settings.containsKey("gta4_reflection_resolution"));
         }
+    }
+
+    @Test public void presetsPreservePreviouslySelected60Fps() {
+        Map<String,String> settings=new LinkedHashMap<>();
+        settings.put("gta4_frame_limit","60");
+        for(String profile:new String[]{S26GraphicsProfiles.BALANCED,S26GraphicsProfiles.HIGH,S26GraphicsProfiles.MAX_EXPERIMENTAL,S26GraphicsProfiles.ULTRA_VISUAL}){
+            S26GraphicsProfiles.apply(settings,profile);
+            assertEquals("60",settings.get("gta4_frame_limit"));
+        }
+    }
+
+    @Test public void ultraVisualEnablesReflectionCaptures() {
+        Map<String,String> settings=new LinkedHashMap<>();
+        S26GraphicsProfiles.apply(settings,S26GraphicsProfiles.ULTRA_VISUAL);
+        assertEquals("ultra",settings.get("gta4_native_smaa_quality"));
+        assertEquals("1",settings.get("gta4_native_water_reflection_interval"));
+        assertEquals("1",settings.get("gta4_native_environment_reflection_interval"));
+        assertEquals("4x",settings.get("gta4_reflection_aa"));
+        assertEquals("full",settings.get("gta4_reflection_resolution"));
+        assertEquals("true",settings.get("android_thermal_guard"));
     }
 
     @Test public void highAndMaximumAreOptIn() {
