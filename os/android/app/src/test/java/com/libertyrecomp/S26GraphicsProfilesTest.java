@@ -16,7 +16,8 @@ public class S26GraphicsProfilesTest {
                 S26GraphicsProfiles.HIGH,
                 S26GraphicsProfiles.MAX_EXPERIMENTAL,
                 S26GraphicsProfiles.ULTRA_VISUAL,
-                S26GraphicsProfiles.POLICE_LIGHTS_TRAFFIC}) {
+                S26GraphicsProfiles.POLICE_LIGHTS_TRAFFIC,
+                S26GraphicsProfiles.ULTRA_DRIVING}) {
             Map<String,String> settings = new LinkedHashMap<>();
             settings.put("unrelated_setting","keep_me");
             S26GraphicsProfiles.apply(settings,profile);
@@ -32,10 +33,31 @@ public class S26GraphicsProfilesTest {
     @Test public void presetsPreservePreviouslySelected60Fps() {
         Map<String,String> settings=new LinkedHashMap<>();
         settings.put("gta4_frame_limit","60");
-        for(String profile:new String[]{S26GraphicsProfiles.BALANCED,S26GraphicsProfiles.HIGH,S26GraphicsProfiles.MAX_EXPERIMENTAL,S26GraphicsProfiles.ULTRA_VISUAL,S26GraphicsProfiles.POLICE_LIGHTS_TRAFFIC}){
+        for(String profile:new String[]{S26GraphicsProfiles.BALANCED,S26GraphicsProfiles.HIGH,S26GraphicsProfiles.MAX_EXPERIMENTAL,S26GraphicsProfiles.ULTRA_VISUAL,S26GraphicsProfiles.POLICE_LIGHTS_TRAFFIC,S26GraphicsProfiles.ULTRA_DRIVING}){
             S26GraphicsProfiles.apply(settings,profile);
             assertEquals("60",settings.get("gta4_frame_limit"));
         }
+    }
+
+    @Test public void ultraDrivingPreservesNearSceneAndExisting60Fps() {
+        Map<String,String> previous=new LinkedHashMap<>(),driving=new LinkedHashMap<>();
+        previous.put("gta4_frame_limit","60");
+        driving.put("gta4_frame_limit","60");
+        S26GraphicsProfiles.apply(previous,S26GraphicsProfiles.ULTRA_VISUAL);
+        S26GraphicsProfiles.apply(driving,S26GraphicsProfiles.ULTRA_DRIVING);
+        for(String key:new String[]{"resolution","gta4_native_upscaler","gta4_native_anti_aliasing",
+                "gta4_native_smaa_quality","gta4_shadow_map_base_size",
+                "gta4_shadow_distance_scale","gta4_reflection_resolution","gta4_reflection_aa"})
+            assertEquals(key,previous.get(key),driving.get(key));
+        assertEquals("1.2",driving.get("gta4_draw_distance_scale"));
+        assertEquals("true",driving.get("gta4_dynamic_draw_distance"));
+        assertEquals("2",driving.get("gta4_native_environment_reflection_interval"));
+        assertEquals("2",driving.get("gta4_native_water_reflection_interval"));
+        assertEquals("2",driving.get("gta4_native_pipeline_workers"));
+        assertEquals("true",driving.get("gta4_native_converted_texture_disk_cache"));
+        assertEquals("false",driving.get("android_gpu_turbo"));
+        assertEquals("true",driving.get("android_thermal_guard"));
+        assertEquals("60",driving.get("gta4_frame_limit"));
     }
 
     @Test public void policeLightTrafficUsesUltraSpatialQualityWithFewerReflectionUpdates() {
