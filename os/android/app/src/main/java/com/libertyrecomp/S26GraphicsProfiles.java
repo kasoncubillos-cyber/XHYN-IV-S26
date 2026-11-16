@@ -12,9 +12,10 @@ final class S26GraphicsProfiles {
     static final String MAX_EXPERIMENTAL = "max_experimental";
     static final String ULTRA_VISUAL = "ultra_visual";
     static final String POLICE_LIGHTS_TRAFFIC = "police_lights_traffic";
+    static final String ULTRA_DRIVING = "ultra_driving";
 
     static void apply(Map<String,String> values, String profile) {
-        if (!BALANCED.equals(profile) && !HIGH.equals(profile) && !MAX_EXPERIMENTAL.equals(profile) && !ULTRA_VISUAL.equals(profile) && !POLICE_LIGHTS_TRAFFIC.equals(profile))
+        if (!BALANCED.equals(profile) && !HIGH.equals(profile) && !MAX_EXPERIMENTAL.equals(profile) && !ULTRA_VISUAL.equals(profile) && !POLICE_LIGHTS_TRAFFIC.equals(profile) && !ULTRA_DRIVING.equals(profile))
             throw new IllegalArgumentException("Unknown S26 graphics profile: " + profile);
 
         // Never overwrite a frame cap the player has already tested successfully.
@@ -104,6 +105,37 @@ final class S26GraphicsProfiles {
                 values.put("gta4_native_converted_texture_disk_cache", "true");
                 // Do not force GPU Turbo: heavy police lights can already raise heat.
                 // Keep the frame limit the player already chose (including 60 FPS).
+                break;
+            case ULTRA_DRIVING:
+                // Large streaming workload while driving at speed; keep spatial
+                // sharpness at 1080p and all near-scene shadows and anti-aliasing.
+                // The same frame cap chosen by the user remains in force.
+                values.put("resolution", "1080p");
+                values.put("gta4_native_upscaler", "native");
+                values.put("gta4_native_anti_aliasing", "smaa");
+                values.put("gta4_native_smaa_quality", "ultra");
+                values.put("gta4_shadow_map_base_size", "1024");
+                values.put("gta4_shadow_distance_scale", "1.25");
+                values.put("gta4_reflection_resolution", "full");
+                values.put("gta4_water_reflection_resolution", "full");
+                values.put("gta4_mirror_reflection_resolution", "full");
+                values.put("gta4_reflection_aa", "4x");
+                values.put("gta4_reflection_capture_distance", "original");
+                values.put("gta4_native_water_reflection_interval", "2");
+                values.put("gta4_native_environment_reflection_interval", "2");
+                // 1.2 instead of 1.4 reduces traffic/geometry work and asset
+                // streaming pressure, without lowering output resolution.
+                values.put("gta4_draw_distance_scale", "1.2");
+                values.put("gta4_dynamic_draw_distance", "true");
+                values.put("gta4_motion_blur", "false");
+                values.put("gta4_native_pipeline_workers", "2");
+                values.put("gta4_native_pipeline_prewarm", "true");
+                values.put("gta4_native_pipeline_lookahead", "true");
+                values.put("gta4_native_startup_prepare_seconds", "10");
+                values.put("gta4_native_converted_texture_disk_cache", "true");
+                values.put("gta4_native_texture_reuse_extended", "false");
+                values.put("android_gpu_turbo", "false");
+                values.put("android_thermal_guard", "true");
                 break;
             default: throw new AssertionError(profile);
         }
