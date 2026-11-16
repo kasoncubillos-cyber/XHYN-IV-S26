@@ -11,6 +11,7 @@ on:
       - os/android/scripts/env.sh
       - glue/rexglue-sdk-main/src/kernel/crt/**
       - glue/rexglue-sdk-main/src/core/timer_queue.cpp
+      - glue/rexglue-sdk-main/include/rex/string/numeric.h
       - glue/rexglue-sdk-main/src/kernel/xam/xam_info.cpp
       - os/android/app/src/main/java/com/libertyrecomp/**
       - os/android/app/src/test/java/com/libertyrecomp/**
@@ -65,6 +66,7 @@ jobs:
           df -h .
           echo "ANDROID_SDK_ROOT=$ANDROID_HOME" >> "$GITHUB_ENV"
           echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/29.0.14206865" >> "$GITHUB_ENV"
+          echo "ANDROID_NDK=$ANDROID_HOME/ndk/29.0.14206865" >> "$GITHUB_ENV"
 
       - name: Verify independent application identity
         run: |
