@@ -47,8 +47,8 @@ jobs:
           from pathlib import Path
           native=Path('glue/rexglue-sdk-main/gta4-recomp/src/gta4_phone_cheat_catalog.h').read_text()
           java=Path('os/android/app/src/main/java/com/libertyrecomp/CheatsUi.java').read_text()
-          ids=[int(i) for i in re.search(r'IDS\\s*=\\s*\\{([^}]*)\\}',java).group(1).split(',')]
-          native_ids=[int(i) for i in re.findall(r'^\\s*\\{(\\d+),\\s*"',native,re.MULTILINE)]
+          ids=[int(i) for i in re.search(r'IDS\s*=\s*\{([^}]*)\}',java).group(1).split(',')]
+          native_ids=[int(i) for i in re.findall(r'^\s*\{(\d+),\s*"',native,re.MULTILINE)]
           assert len(ids)==25 and ids==native_ids, (ids,native_ids)
           print('Android and native catalog agree on all 25 cheat IDs')
           PY
