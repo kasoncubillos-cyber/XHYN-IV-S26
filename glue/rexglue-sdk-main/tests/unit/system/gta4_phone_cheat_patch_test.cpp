@@ -6,7 +6,7 @@
 #define CHECK_P(...) do { if (!(__VA_ARGS__)) throw std::runtime_error(#__VA_ARGS__); } while(false)
 #else
 #include <catch2/catch_test_macros.hpp>
-#define CHECK_P(...) REQUIRE(__VA_ARGS__)
+#define CHECK_P(...) REQUIRE((__VA_ARGS__))
 #endif
 namespace {
 using namespace gta4::quicksave;
