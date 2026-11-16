@@ -5,7 +5,7 @@
 #include <string_view>
 
 // Menu data only. This catalogue never invokes or queues a cheat.
-// The phone script integration is a separate, explicitly tested step.
+// The phone script adapter maps these IDs to reserved menu actions.
 namespace gta4::phone_cheats {
 
 enum class Category : std::uint8_t {
@@ -48,6 +48,17 @@ inline constexpr std::array<Entry, 25> kCatalog{{
     {108, "Cambiar al atardecer", Category::kMundo},
     {109, "Cambiar a medianoche", Category::kMundo},
 }};
+
+inline constexpr uint32_t kMenuState = 1035, kActionBase = 0x7E00;
+inline constexpr std::array<std::string_view, 25> kLabelKeys = {
+    "LR_C00", "LR_C01", "LR_C02", "LR_C03", "LR_C04", "LR_C05", "LR_C06",
+    "LR_C07", "LR_C08", "LR_C09", "LR_C10", "LR_C11", "LR_C12", "LR_C13",
+    "LR_C14", "LR_C15", "LR_C16", "LR_C17", "LR_C18", "LR_C19", "LR_C20",
+    "LR_C21", "LR_C22", "LR_C23", "LR_C24"};
+constexpr const Entry* FromAction(uint32_t action) noexcept {
+  return action >= kActionBase && action - kActionBase < kCatalog.size()
+      ? &kCatalog[action - kActionBase] : nullptr;
+}
 
 constexpr const Entry* Find(std::uint32_t index) noexcept {
   for (const Entry& entry : kCatalog)

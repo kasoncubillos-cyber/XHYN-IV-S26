@@ -1,55 +1,86 @@
-# XHYN IV S26 — Teléfono de Niko / catálogo de trucos (preparación v105)
+# XHYN IV S26 — teléfono de Niko, candidato v105
 
-## Requisito
-La actualización siguiente debe instalarse sobre la aplicación estable v104 instalada,
-manteniendo paquete, firma digital y datos del usuario. No generar una aplicación paralela.
+## Identidad y autorización
 
-- `applicationId = "com.kasoncubillos.xhynivs26stable"`.
-- Incrementar `versionCode` de 104 a 105 **solo cuando** la funcionalidad esté implementada,
-  compilada en el motor ARM64, verificada y lista para el canal de pruebas.
-- Firmar exclusivamente con los mismos secretos de la v104:
-  `XHYN_S26_KEYSTORE_BASE64` y `XHYN_S26_KEYSTORE_PASSWORD`.
-- No modificar el almacén de partidas para precargar trucos; no ejecutar trucos automáticamente.
+La referencia instalada del propietario es **v102, 0.5.9.8-s26-stable3**.
+La rama contiene v104, pero no debe exigirse instalarla como paso intermedio.
 
-## Función objetivo
-Con el teléfono original de Niko ya disponible, abrir **Cheats/Trucos** y ver las 25
-acciones compatibles sin marcar ningún número antes. Al seleccionar, cerrar el teléfono y
-ejecutar exactamente un truco cuando el contexto de juego libre lo permita. Al cancelar,
-no activar nada. Mantener intacto Quicksave, la navegación y la presentación del teléfono.
+- Mantener `applicationId = com.kasoncubillos.xhynivs26stable`.
+- Mantener la clave privada permanente y su configuración; no generar ni sustituir claves.
+- `versionCode` permanece en **104** hasta completar integración, build y pruebas reales;
+  después se podrá cambiar a **105**.
+- No firmar, publicar ni distribuir APK sin autorización posterior del propietario.
+- No modificar partidas ni el bitset persistente de trucos desbloqueados.
 
-## Código existente
-- `gta4_phone_cheat_catalog.h`: 25 entradas, etiquetas/categorías, índices sin duplicar.
-- `gta4_phone_cheat_catalog_test.cpp`: cobertura de entradas/índices (incluido 5 no admitido).
-- `gta4_cheat_policy.h`, `gta4_quicksave_hooks.cpp`: cola y ejecución actual de trucos.
-- `gta4_phone_quicksave_profiles.h`: extensión verificada de `spcellphonemain` por hash
-  que añade el botón Quicksave. Es la referencia para ampliar el teléfono nativo.
+## Implementación candidata
 
-## Bloqueador técnico: no empaquetar motor antiguo
-El workflow `s26-updates-signed.yml` reutiliza **los 11 .so de Alpha1** con
-`package_release.py --native-apk`. Ese mecanismo solo sirve para arreglos Java/recursos,
-**no** distribuye cambios de `gta4-recomp/src/*.cpp` ni nuevos ganchos de teléfono.
+`gta4_phone_cheat_patch.h` amplía el parche existente de Quicksave **en memoria**,
+antes de que el constructor copie el programa `spcellphonemain`. No abre Android UI.
 
-Por eso la nueva versión debe:
-1. Identificar y validar con evidencia el constructor del submenú stock Cheats o crear
-   un submenú nativo compatible en `spcellphonemain` (no una pantalla Android externa).
-2. Ampliar el parche con contratos de hash/offset y fallar de forma segura si cambian.
-3. Compilar el motor nativo desde esta rama con
-   `tools/setup_repo.py`, `os/android/scripts/build_native.sh` y
-   `os/android/scripts/build_driver_proxy.sh`.
-4. Usar `package_release.py --unsigned` **sin** `--native-apk`; verificar que el
-   paquete contenga las bibliotecas del build actual.
-5. Ejecutar regresiones, comprobar efecto real en S26 y solo después generar un APK
-   firmado con la identidad estable y versión incremental.
+1. Se exige el mismo SHA-256 del SCO decodificado y el perfil de tamaño/locales
+   que usa Quicksave. Solo se amplía el juego base, episodio 0, compatible con
+   las 25 acciones del puente existente; TLAD/TBoGT conservan Quicksave.
+2. Se localiza la llamada stock que añade `CP_CHEATS`, la construcción del
+   estado **1035** y la aceptación que llama al mapeo stock de `ACTIVATE_CHEAT`.
+   Los contratos comprueban helpers, argumentos y unicidad. No se usan offsets PC.
+3. Se suprime la entrada stock condicional y se añade siempre **Trucos / Cheats**
+   apuntando al estado original 1035. Se conserva el renderer y la navegación stock.
+4. Entre el reset y el renderer se sustituye el bucle de trucos desbloqueados por
+   25 llamadas al helper de opciones original. Se usan acciones reservadas
+   `0x7E00..0x7E18` y claves de texto `LR_C00..LR_C24`.
+5. La aceptación valida programa, episodio, estado y acción seleccionada. Solo
+   entonces solicita una acción mediante la cola existente. La solicitud espera
+   al cierre stock del teléfono y a gameplay válido; expira o se cancela al
+   cambiar mundo, jugador o contexto. El mapeo retail original no se ejecuta además.
+6. Listar, navegar y volver no llaman al thunk de solicitudes. El constructor
+   de la lista no modifica el estado de las partidas ni activa trucos.
+7. Si un contrato falla, se conserva el teléfono stock y el parche de Quicksave;
+   se registra `gta4-phone-cheats: contract rejected`. El fallo no se presenta
+   como integración funcional.
 
-## Estado verificable
-**NO IMPLEMENTADO TODAVÍA:** las entradas no están vinculadas al teléfono.
-El catálogo aislado y las pruebas no constituyen una APK jugable con menú.
-La rama se conserva como PR en borrador hasta pasar las comprobaciones.
+Desactivar Quicksave ya no impide analizar el script del teléfono. El parámetro
+`quicksave_enabled` conserva la preferencia de ocultar su entrada y permite
+integrar Cheats independientemente.
 
-## Prueba final
-- Nuevo juego y partida guardada existente: 25 acciones visibles sin marcación.
-- Ninguna activación al listar ni al cancelar; una acción exacta tras seleccionarla.
-- Continuidad del menú y Quicksave, sin bloqueo de logros inesperado.
-- No empeorar FPS ni romper estabilidad térmica.
-- `apksigner verify` y comparación de certificado con v104; mismo `applicationId`,
-  `versionCode > 104`; instalación directa encima y datos intactos.
+La estructura de referencia de los estados, helpers y aceptación puede revisarse en
+[spcellphonemain decompilado, revisión fija](https://github.com/0x52617665/GTAIVMissionScripts/blob/9d836ff2d955ba2b19048c496f81a0f9eb6c84cb/IV/spcellphonemain.txt).
+Es evidencia de diseño, **no** una prueba binaria del SCO Xbox con el hash admitido.
+
+## Pruebas y límites
+
+- Catálogo: 80 comprobaciones, 25 IDs coincidentes con `CheatsUi.java`.
+- Quicksave: 155971 aserciones de políticas y contratos de parche.
+- Adaptador: fixture de instrucciones enlazadas **sintético**, 25 entradas,
+  conservación del renderer, IDs reservados, rechazo de contratos ausentes,
+  duplicados y episodio incorrecto; espera al cierre, expiración y cambio de mundo.
+- Registro de hacks: 110 registros válidos.
+
+Estos tests no demuestran que los contratos coincidan con el SCO real instalado,
+que la pantalla se renderice correctamente ni que se produzcan los 25 efectos.
+No hay datos del juego ni dispositivo Galaxy S26 conectado en el entorno de trabajo.
+La PR sigue en borrador y **no es todavía una actualización lista para instalar**.
+
+## Compilación ARM64
+
+El workflow `s26-phone-native-ci.yml` valida catálogo, adaptador y regresión de
+Quicksave en cada cambio relevante. Su ejecución manual con `build_native=true`
+prepara dependencias, compila el motor y el proxy desde el código fuente y muestra
+la arquitectura y hashes de las bibliotecas. No crea, firma ni sube APK.
+
+El primer intento local de `build_native.sh 2` se detuvo antes de configurar:
+`no NDK at /home/agent/Android/Sdk/ndk/29.0.14206865`.
+El build remoto y sus resultados deben registrarse antes de considerar listo v105.
+No usar el workflow firmado `s26-updates-signed.yml` para transportar este cambio:
+reutiliza bibliotecas Alpha1, que no contienen la integración C++.
+
+## Validación pendiente antes de 105
+
+- Verificar contratos contra el SCO real admitido y el log de publicación del programa.
+- Nuevo juego y partida existente: menú visible sin marcar, 25 acciones, scroll completo,
+  Back sin activación y una sola acción exacta por aceptación.
+- Probar Quicksave habilitado/deshabilitado, regreso al menú, llamadas e interrupciones.
+- Probar los efectos de las 25 acciones en juego libre y cancelaciones por carga/misión.
+- Comprobar estabilidad, FPS y protección térmica en Galaxy S26.
+- Con autorización posterior de firma: comparar certificado contra **v102**, verificar
+  paquete y versión con herramientas Android, instalar encima sin desinstalar ni
+  borrar datos y comprobar las mismas partidas. Nunca usar una firma de prueba.
