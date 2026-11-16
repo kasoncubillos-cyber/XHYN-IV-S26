@@ -48,7 +48,7 @@ export REX_OUT_DIR="$REPO/glue/rexglue-sdk-main/out/linux-arm64"
 export JNILIBS="$APP_DIR/app/src/main/jniLibs/arm64-v8a"
 export ASSETS="$APP_DIR/app/src/main/assets"
 
-export PKG="${PKG:-com.xhyn.ivrecomp}"
+export PKG="${PKG:-com.kasoncubillos.xhynivs26beta}"
 # The launcher; "--ez play true" makes it start the game at once.
 export ACTIVITY="${ACTIVITY:-$PKG/com.libertyrecomp.LauncherActivity}"
 # The game runs in its own process.

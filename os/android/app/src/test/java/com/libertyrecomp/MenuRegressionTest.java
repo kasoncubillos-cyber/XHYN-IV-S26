@@ -42,8 +42,9 @@ public class MenuRegressionTest {
         Field cached=GpuInfo.class.getDeclaredField("cached");cached.setAccessible(true);cached.set(null,"Adreno (TM) 750");
     }
     private static View find(View root,String text){
-        if(root instanceof TextView&&((TextView)root).getText().toString().equals(text))return root;
-        if(text.equals(String.valueOf(root.getContentDescription())))return root;
+        String localized=EsUi.t(text);
+        if(root instanceof TextView&&(text.equals(((TextView)root).getText().toString())||localized.equals(((TextView)root).getText().toString())))return root;
+        if(text.equals(String.valueOf(root.getContentDescription()))||localized.equals(String.valueOf(root.getContentDescription())))return root;
         if(root instanceof ViewGroup){ViewGroup group=(ViewGroup)root;for(int i=0;i<group.getChildCount();i++){View found=find(group.getChildAt(i),text);if(found!=null)return found;}}
         return null;
     }
@@ -137,7 +138,7 @@ public class MenuRegressionTest {
             scroll.scrollTo(0,scroll.getChildAt(0).getHeight());Shadows.shadowOf(Looper.getMainLooper()).idle();int before=scroll.getScrollY();assertTrue("Fixture must scroll",before>0);
             click(row,"Off");
             Shadows.shadowOf(Looper.getMainLooper()).idle();assertEquals(before,scroll.getScrollY());
-            settings.onBackPressed();Shadows.shadowOf(Looper.getMainLooper()).idle();assertEquals("Unsaved settings",Shadows.shadowOf(latest()).getTitle().toString());press(latest(),AlertDialog.BUTTON_NEUTRAL);assertTrue(settings.isShowing());
+            settings.onBackPressed();Shadows.shadowOf(Looper.getMainLooper()).idle();assertEquals(EsUi.t("Unsaved settings"),Shadows.shadowOf(latest()).getTitle().toString());press(latest(),AlertDialog.BUTTON_NEUTRAL);assertTrue(settings.isShowing());
             click(decor,"Discard");android.widget.LinearLayout cap=decor.findViewWithTag("gta4_frame_limit");((Button)cap.getChildAt(1)).performClick();Shadows.shadowOf(Looper.getMainLooper()).idle();click(latest().getWindow().getDecorView(),"40 FPS");click(decor,"Save");
             assertEquals("40",MobileConfig.read(MobileConfig.file(data)).get("gta4_frame_limit"));assertEquals("540p",PendingSettings.read(data).get("resolution"));settings.dismiss();
         }

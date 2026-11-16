@@ -20,7 +20,7 @@ import org.robolectric.shadows.ShadowAlertDialog;
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 public class Android10MenuTest {
  private static View find(View v,String text){
-  if(text.equals(String.valueOf(v.getContentDescription()))||v instanceof TextView&&text.equals(((TextView)v).getText().toString()))return v;
+  String localized=EsUi.t(text);if(text.equals(String.valueOf(v.getContentDescription()))||localized.equals(String.valueOf(v.getContentDescription()))||v instanceof TextView&&(text.equals(((TextView)v).getText().toString())||localized.equals(((TextView)v).getText().toString())))return v;
   if(v instanceof ViewGroup){ViewGroup g=(ViewGroup)v;for(int i=0;i<g.getChildCount();i++){View result=find(g.getChildAt(i),text);if(result!=null)return result;}}return null;
  }
  @Test public void overflowAndBottomFooter()throws Exception{

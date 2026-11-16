@@ -52,6 +52,9 @@ final class MobileSettingsUi {
     };
     private static final class State {String category="Video";final Map<String,Integer> scroll=new HashMap<>();}
     private static final Map<Activity,State> states=new WeakHashMap<>();
+    private static final Choice[] LANGUAGE={
+        new Choice("user_language","Game language","5",true,"5","1")
+    };
     private static final Choice[] TOUCH={
         new Choice("gamepad_left_deadzone","Left stick deadzone","0",false,0,.4,.01),
         new Choice("gamepad_right_deadzone","Right stick deadzone","0",false,0,.4,.01),
@@ -118,7 +121,7 @@ final class MobileSettingsUi {
     };
     static void select(Activity a,String category){states.computeIfAbsent(a,key->new State()).category=category;}
     static final Set<String> KEYS=new LinkedHashSet<>();
-    static {for(Choice c:GRAPHICS)KEYS.add(c.key);for(Choice c:TOUCH)KEYS.add(c.key);for(Choice c:PERFORMANCE)KEYS.add(c.key);}
+    static {for(Choice c:GRAPHICS)KEYS.add(c.key);for(Choice c:TOUCH)KEYS.add(c.key);for(Choice c:PERFORMANCE)KEYS.add(c.key);for(Choice c:LANGUAGE)KEYS.add(c.key);}
     static AlertDialog graphics(Activity a,File data,Runtime runtime){return show(a,data,runtime,false,null);}
     static AlertDialog graphics(Activity a,File data,Runtime runtime,Runnable logs){return show(a,data,runtime,false,null,logs);}
     static AlertDialog touch(Activity a,File data,Runtime runtime){return touch(a,data,runtime,xbox->a.startActivity(new Intent(a,TouchEditorActivity.class).putExtra("xbox",xbox)));}
@@ -127,6 +130,7 @@ final class MobileSettingsUi {
     private static String uiKey(String key){return key.equals("ui_reduce_motion")?"reduce_motion":key.equals("ui_battery_refresh")?"battery_refresh":"sustained";}
     private static boolean restart(Choice c,Map<String,String> before){return c.restart||(c.key.equals("gta4_native_anti_aliasing")&&!Arrays.asList("off","fxaa","smaa").contains(before.get(c.key)));}
     private static String category(Choice c){
+        if(c.key.equals("user_language"))return "Language";
         if(c.key.startsWith("gamepad_"))return "Controller";
         if(c.key.startsWith("audio_")||c.key.equals("gta4_phone_rumble_strength"))return "Audio";
         if(c.key.startsWith("mnk_")||c.key.startsWith("gta4_touch_")||c.key.startsWith("gta4_phone_gyro"))return "Touch controls";
@@ -142,14 +146,14 @@ final class MobileSettingsUi {
         final Map<String,String> saved;
         try{if(runtime==null)MobileConfig.migrateRemovedUpscaler(MobileConfig.file(data));saved=MobileConfig.read(MobileConfig.file(data));saved.putAll(PendingSettings.read(data));}
         catch(IOException e){Toast.makeText(a,"Cannot read settings: "+e.getMessage(),Toast.LENGTH_LONG).show();return null;}
-        ArrayList<Choice> choices=new ArrayList<>();Collections.addAll(choices,GRAPHICS);Collections.addAll(choices,TOUCH);Collections.addAll(choices,PERFORMANCE);
+        ArrayList<Choice> choices=new ArrayList<>();Collections.addAll(choices,GRAPHICS);Collections.addAll(choices,TOUCH);Collections.addAll(choices,PERFORMANCE);Collections.addAll(choices,LANGUAGE);
         Map<String,String> before=new LinkedHashMap<>(),draft=new LinkedHashMap<>();
         for(Choice c:choices){String value=c.key.startsWith("ui_")?Boolean.toString(UiPreferences.get(a,uiKey(c.key))):runtime==null?saved.get(c.key):runtime.get(c.key);if(runtime==null&&value==null&&(c.key.equals("android_gpu_turbo")||c.key.equals("android_thermal_guard")))value=Boolean.toString(a.getSharedPreferences("performance_test",0).getBoolean(c.key.equals("android_gpu_turbo")?"gpu_turbo":"thermal_guard",false));if(restart(c,saved)&&saved.containsKey(c.key))value=saved.get(c.key);if(value==null||value.isEmpty())value=saved.getOrDefault(c.key,c.initial);before.put(c.key,value);draft.put(c.key,value);}
         LinearLayout body=new LinearLayout(a);body.setOrientation(LinearLayout.VERTICAL);
         State state=states.computeIfAbsent(a,key->new State());
-        String[] categories={"Video","Graphics","Performance","Touch controls","Controller","Overlay","Audio"};String[] selected={touch?"Touch controls":state.category};
+        String[] categories={"Video","Graphics","Performance","Touch controls","Controller","Overlay","Audio","Language"};String[] selected={touch?"Touch controls":state.category};
         HorizontalScrollView tabScroll=new HorizontalScrollView(a);tabScroll.setHorizontalScrollBarEnabled(false);LinearLayout tabs=new LinearLayout(a);tabScroll.addView(tabs);LinearLayout navigation=new LinearLayout(a);navigation.addView(tabScroll,new LinearLayout.LayoutParams(0,-2,1));body.addView(navigation);
-        EditText search=new EditText(a);search.setTextColor(ModernUi.TEXT);search.setHintTextColor(ModernUi.MUTED);search.setHint("Search all settings");search.setTextSize(14);search.setSingleLine(true);navigation.setBaselineAligned(false);navigation.addView(search,new LinearLayout.LayoutParams(ModernUi.dp(a,145),ModernUi.dp(a,36)));
+        EditText search=new EditText(a);search.setTextColor(ModernUi.TEXT);search.setHintTextColor(ModernUi.MUTED);search.setHint(EsUi.t("Search all settings"));search.setTextSize(14);search.setSingleLine(true);navigation.setBaselineAligned(false);navigation.addView(search,new LinearLayout.LayoutParams(ModernUi.dp(a,145),ModernUi.dp(a,36)));
         float width=a.getResources().getDisplayMetrics().widthPixels/a.getResources().getDisplayMetrics().density/a.getResources().getConfiguration().fontScale;
         boolean wide=width>=650;
         LinearLayout content=new LinearLayout(a);content.setOrientation(wide?LinearLayout.HORIZONTAL:LinearLayout.VERTICAL);body.addView(content,new LinearLayout.LayoutParams(-1,0,1));
@@ -157,7 +161,7 @@ final class MobileSettingsUi {
         LinearLayout help=ModernUi.panel(a);TextView helpTitle=ModernUi.text(a,"SETTING DETAILS",16,ModernUi.ACCENT),helpText=ModernUi.text(a,"Select a label or focus an option to read its purpose, performance effects, and when it applies.",13,ModernUi.TEXT);help.addView(helpTitle);help.addView(helpText);ScrollView helpScroll=new ScrollView(a);helpScroll.addView(help);LinearLayout.LayoutParams hp=wide?new LinearLayout.LayoutParams(0,-1,1):new LinearLayout.LayoutParams(-1,ModernUi.dp(a,110));hp.leftMargin=wide?ModernUi.dp(a,8):0;content.addView(helpScroll,hp);
         LinearLayout footer=new LinearLayout(a);footer.setGravity(Gravity.CENTER_VERTICAL);TextView pending=ModernUi.text(a,"No unsaved changes",12,ModernUi.MUTED);footer.addView(pending,new LinearLayout.LayoutParams(0,-2,1));Button reset=ModernUi.button(a,"Reset",false),discard=ModernUi.button(a,"Discard",false);footer.setBaselineAligned(false);footer.addView(reset,new LinearLayout.LayoutParams(-2,ModernUi.dp(a,34)));LinearLayout.LayoutParams discardSize=new LinearLayout.LayoutParams(-2,ModernUi.dp(a,34));discardSize.leftMargin=ModernUi.dp(a,6);footer.addView(discard,discardSize);body.addView(footer);
         final Runnable[] render={null};final AlertDialog[] current={null};OverlayPreview preview=new OverlayPreview(a,draft);
-        Runnable updatePending=()->{preview.invalidate();int changes=0,restarts=0;for(Choice c:choices)if(!Objects.equals(before.get(c.key),draft.get(c.key))){changes++;if(restart(c,before))restarts++;}pending.setText(changes==0?(PendingSettings.pending(data)?"Restart pending":"No unsaved changes"):changes+" unsaved · "+restarts+" require next launch");};
+        Runnable updatePending=()->{preview.invalidate();int changes=0,restarts=0;for(Choice c:choices)if(!Objects.equals(before.get(c.key),draft.get(c.key))){changes++;if(restart(c,before))restarts++;}pending.setText(changes==0?(PendingSettings.pending(data)?"Reinicio pendiente":"Sin cambios pendientes"):changes+" cambios sin guardar · "+restarts+" para el próximo inicio");};
         java.util.function.BooleanSupplier commit=()->{
             Map<String,String> changed=new LinkedHashMap<>();for(Choice c:choices)if(!Objects.equals(before.get(c.key),draft.get(c.key)))changed.put(c.key,draft.get(c.key));
             Map<String,String> allChanged=new LinkedHashMap<>(changed),next=new LinkedHashMap<>();
@@ -174,7 +178,7 @@ final class MobileSettingsUi {
             ModernUi.builder(a).setTitle("Unsaved settings").setMessage("Save your changes before leaving?").setPositiveButton("Save",(d,w)->{if(commit.getAsBoolean())current[0].dismiss();}).setNegativeButton("Discard",(d,w)->current[0].dismiss()).setNeutralButton("Keep editing",null).show();return false;
         };
         if(logs!=null){
-            Button reports=ModernUi.icon(a,"Logs","diagnostics",false);reports.setContentDescription("Logs & troubleshooting");
+            Button reports=ModernUi.icon(a,"Logs","diagnostics",false);reports.setContentDescription(EsUi.t("Logs & troubleshooting"));
             LinearLayout.LayoutParams rp=new LinearLayout.LayoutParams(-2,ModernUi.dp(a,36));rp.rightMargin=ModernUi.dp(a,8);footer.addView(reports,1,rp);
             reports.setOnClickListener(v->{Runnable leave=()->{current[0].dismiss();logs.run();};
                 if(before.equals(draft)){leave.run();return;}
@@ -183,23 +187,37 @@ final class MobileSettingsUi {
                     .setNegativeButton("Discard",(d,w)->leave.run()).setNeutralButton("Keep editing",null).show();
             });
         }
-        java.util.function.Consumer<Choice> explain=c->{helpTitle.setText(c.label.toUpperCase(Locale.ROOT));helpText.setText(guide(c.key)+"\n\nDefault: "+(c.values==null?numericLabel(c,Double.parseDouble(c.initial)):pretty(c.key,c.initial))+"\n\n"+(c.restart?"Saved for the next launch. You can quit after saving to apply it.":"Applies when you save.")+(c.key.equals("gta4_present_mode")&&runtime!=null?"\n\nActive presentation: "+runtime.get("gta4_session_present_mode"):"")+(c.key.equals("gta4_native_anti_aliasing")&&runtime!=null?"\n\n"+activeAa(runtime):""));};
+        java.util.function.Consumer<Choice> explain=c->{helpTitle.setText(EsUi.t(c.label).toUpperCase(Locale.ROOT));helpText.setText(EsUi.guide(c.key)+"\n\nValor predeterminado: "+(c.values==null?numericLabel(c,Double.parseDouble(c.initial)):pretty(c.key,c.initial))+"\n\n"+(c.restart?"Saved for the next launch. You can quit after saving to apply it.":"Applies when you save.")+(c.key.equals("gta4_present_mode")&&runtime!=null?"\n\nActive presentation: "+runtime.get("gta4_session_present_mode"):"")+(c.key.equals("gta4_native_anti_aliasing")&&runtime!=null?"\n\n"+activeAa(runtime):""));};
         final java.util.function.Consumer<Boolean> editor=edit!=null?edit:runtime==null?xbox->a.startActivity(new Intent(a,TouchEditorActivity.class).putExtra("xbox",xbox)):null;
         ArrayList<Button> tabButtons=new ArrayList<>();
         for(String category:categories){Button b=ModernUi.button(a,category,false);b.setTag("ui-tab");LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-2,ModernUi.dp(a,34));lp.rightMargin=ModernUi.dp(a,4);tabs.addView(b,lp);tabButtons.add(b);b.setOnClickListener(v->{state.scroll.put(selected[0],scroll.getScrollY());selected[0]=category;state.category=category;search.setText("");render[0].run();});}
         render[0]=()->{
             state.category=selected[0];rows.removeAllViews();for(int i=0;i<categories.length;i++)ModernUi.selected(tabButtons.get(i),selected[0].equals(categories[i]));
             String query=search.getText().toString().trim().toLowerCase(Locale.ROOT);int count=0;
-            if(selected[0].equals("Video")&&query.isEmpty()&&runtime!=null)rows.addView(ModernUi.text(a,"Active rendering: "+runtime.get("gta4_effective_upscaling"),12,ModernUi.MUTED));
+            if(selected[0].equals("Video")&&query.isEmpty()&&runtime!=null)rows.addView(ModernUi.text(a,"Renderizado activo: "+runtime.get("gta4_effective_upscaling"),12,ModernUi.MUTED));
             if(selected[0].equals("Overlay")&&query.isEmpty()){ModernUi.gridAction(a,rows,"Edit overlay",()->OverlayEditorUi.show(a,draft,()->{updatePending.run();render[0].run();rows.post(()->{View launch=rows.findViewWithTag("overlay-editor-launch");if(launch!=null)launch.requestFocus();});})).setTag("overlay-editor-launch");}
             if(selected[0].equals("Performance")&&query.isEmpty()&&runtime!=null)rows.addView(ModernUi.text(a,ThermalStatus.summary(runtime.get("gta4_thermal_status"),System.nanoTime(),false),12,ModernUi.ACCENT));
+            if(selected[0].equals("Graphics")&&query.isEmpty()){
+                ModernUi.gridAction(a,rows,"S26 Balanced (720p)",()->{S26GraphicsProfiles.apply(draft,S26GraphicsProfiles.BALANCED);updatePending.run();render[0].run();});
+                ModernUi.gridAction(a,rows,"S26 High Quality (900p)",()->{S26GraphicsProfiles.apply(draft,S26GraphicsProfiles.HIGH);updatePending.run();render[0].run();});
+                ModernUi.gridAction(a,rows,"S26 Max Quality (experimental)",()->ModernUi.builder(a)
+                    .setTitle("Gráficos experimentales")
+                    .setMessage("1080p, sombras y reflejos detallados. Puede producir caídas de FPS o calentamiento. Guarda y reinicia para probarlo.")
+                    .setNegativeButton("Cancel",null)
+                    .setPositiveButton("Probar máximo", (d,w)->{S26GraphicsProfiles.apply(draft,S26GraphicsProfiles.MAX_EXPERIMENTAL);updatePending.run();render[0].run();}).show());
+                ModernUi.gridAction(a,rows,"S26 Ultra Visual (experimental)",()->ModernUi.builder(a)
+                    .setTitle("Calidad Ultra visual")
+                    .setMessage("Activa reflejos completos del agua y del entorno, SMAA Ultra, sombras detalladas y mayor distancia de dibujo. Mantiene el límite actual de FPS, pero 60 FPS constantes no están garantizados. Puede calentar el teléfono o bajar el rendimiento. Guarda y reinicia para probarlo.")
+                    .setNegativeButton("Cancelar",null)
+                    .setPositiveButton("Probar Ultra",(d,w)->{S26GraphicsProfiles.apply(draft,S26GraphicsProfiles.ULTRA_VISUAL);updatePending.run();render[0].run();}).show());
+            }
             if(selected[0].equals("Performance")&&query.isEmpty())ModernUi.gridAction(a,rows,"Balanced settings",()->{draft.put("android_gpu_turbo","false");draft.put("android_thermal_guard","true");draft.put("ui_battery_refresh","true");if(sustainedSupported(a))draft.put("ui_sustained","true");draft.put("audio_low_latency","false");updatePending.run();render[0].run();});
             if(selected[0].equals("Controller")&&query.isEmpty()){ModernUi.gridAction(a,rows,"Test controller",()->ControllerTestUi.show(a));ModernUi.gridAction(a,rows,"Controller presets",()->ModernUi.choose(a,"Controller preset",new String[]{"Linear response","Reduce stick drift","Restore controller defaults"},-1,n->{if(n==0)draft.put("gamepad_response_curve","1");else if(n==1){draft.put("gamepad_left_deadzone","0.12");draft.put("gamepad_right_deadzone","0.12");}else for(Choice c:TOUCH)if(c.key.startsWith("gamepad_"))draft.put(c.key,c.initial);updatePending.run();render[0].run();}));}
             if(selected[0].equals("Touch controls")&&query.isEmpty()&&editor!=null){ModernUi.gridAction(a,rows,"Edit mobile controls",()->{if(commit.getAsBoolean()){state.scroll.put(selected[0],scroll.getScrollY());if(runtime!=null){current[0].setOnDismissListener(null);current[0].dismiss();}editor.accept(false);}});}
-            for(Choice c:choices){if(c.key.startsWith("gta4_overlay_"))continue;if(query.isEmpty()?!category(c).equals(selected[0]):!(c.label+" "+guide(c.key)).toLowerCase(Locale.ROOT).contains(query))continue;count++;
+            for(Choice c:choices){if(c.key.startsWith("gta4_overlay_"))continue;if(query.isEmpty()?!category(c).equals(selected[0]):!(EsUi.t(c.label)+" "+EsUi.guide(c.key)+" "+c.label+" "+guide(c.key)).toLowerCase(Locale.ROOT).contains(query))continue;count++;
                 boolean restart=restart(c,before);boolean enabled=(!c.key.equals("ui_sustained")||sustainedSupported(a))&&(!c.key.startsWith("gta4_phone_gyro")||phoneGyroAvailable(a))&&(!c.key.equals("gta4_native_smaa_quality")||"smaa".equals(draft.get("gta4_native_anti_aliasing")))&&(!c.key.startsWith("gta4_fsr1_")||"fsr1".equals(draft.get("gta4_native_upscaler")));
                 LinearLayout row=new LinearLayout(a);row.setGravity(Gravity.CENTER_VERTICAL);row.setBaselineAligned(false);row.setMinimumHeight(ModernUi.dp(a,42));row.setPadding(ModernUi.dp(a,9),ModernUi.dp(a,3),ModernUi.dp(a,9),ModernUi.dp(a,3));row.setBackground(ModernUi.surface(a,0xff202123,10));
-                TextView label=ModernUi.text(a,c.label+(c.key.equals("ui_sustained")&&!sustainedSupported(a)?" · unsupported":"")+(c.key.equals("gta4_present_mode")&&runtime!=null?" · Active: "+runtime.get("gta4_session_present_mode"):"")+(restart?" · restart":""),14,enabled?ModernUi.TEXT:ModernUi.MUTED);label.setFocusable(true);ModernUi.focusableCard(a,label,0xff202123);row.addView(label,new LinearLayout.LayoutParams(0,-2,1.1f));label.setOnClickListener(v->explain.accept(c));label.setOnFocusChangeListener((v,on)->{if(on)explain.accept(c);});
+                TextView label=ModernUi.text(a,EsUi.t(c.label)+(c.key.equals("ui_sustained")&&!sustainedSupported(a)?" · no compatible":"")+(c.key.equals("gta4_present_mode")&&runtime!=null?" · Active: "+runtime.get("gta4_session_present_mode"):"")+(restart?" · reiniciar":""),14,enabled?ModernUi.TEXT:ModernUi.MUTED);label.setFocusable(true);ModernUi.focusableCard(a,label,0xff202123);row.addView(label,new LinearLayout.LayoutParams(0,-2,1.1f));label.setOnClickListener(v->explain.accept(c));label.setOnFocusChangeListener((v,on)->{if(on)explain.accept(c);});
                 if(c.values!=null&&c.values.length==2&&((Arrays.asList(c.values).contains("true")&&Arrays.asList(c.values).contains("false"))||c.key.equals("gta4_present_mode")||c.key.equals("gta4_native_shadow_interval"))){
                     String onValue=c.key.equals("gta4_disable_tlad_film_grain")?"false":c.key.equals("gta4_present_mode")?"vsync":c.key.equals("gta4_native_shadow_interval")?"1":"true",offValue=c.key.equals("gta4_disable_tlad_film_grain")?"true":c.key.equals("gta4_present_mode")?"immediate":c.key.equals("gta4_native_shadow_interval")?"0":"false";
                     LinearLayout toggle=new LinearLayout(a);row.addView(toggle,new LinearLayout.LayoutParams(0,-2,1));
@@ -211,7 +229,7 @@ final class MobileSettingsUi {
                     value.setOnClickListener(v->{
                         explain.accept(c);String[] labels=new String[c.values.length];
                         for(int i=0;i<labels.length;i++)labels[i]=pretty(c.key,c.values[i]);
-                        ModernUi.choose(a,c.label,labels,Arrays.asList(c.values).indexOf(draft.get(c.key)),i->{
+                        ModernUi.choose(a,EsUi.t(c.label),labels,Arrays.asList(c.values).indexOf(draft.get(c.key)),i->{
                             state.scroll.put(selected[0],scroll.getScrollY());draft.put(c.key,c.values[i]);updatePending.run();render[0].run();
                             rows.post(()->{for(int j=0;j<rows.getChildCount();j++)if(c.key.equals(rows.getChildAt(j).getTag())){
                                 View target=((LinearLayout)rows.getChildAt(j)).getChildAt(1);target.requestFocus();break;
@@ -223,7 +241,7 @@ final class MobileSettingsUi {
                     double parsed;try{parsed=Double.parseDouble(draft.get(c.key));if(!Double.isFinite(parsed))throw new NumberFormatException();}catch(Exception e){parsed=Double.parseDouble(c.initial);}
                     LinearLayout field=new LinearLayout(a);field.setOrientation(LinearLayout.HORIZONTAL);field.setGravity(Gravity.CENTER_VERTICAL);field.setBaselineAligned(false);row.addView(field,new LinearLayout.LayoutParams(0,-2,1.5f));TextView amount=ModernUi.text(a,numericLabel(c,parsed),13,ModernUi.ACCENT);amount.setPadding(0,0,0,ModernUi.dp(a,3));amount.setFocusable(true);amount.setGravity(Gravity.RIGHT|Gravity.CENTER_VERTICAL);field.addView(amount,new LinearLayout.LayoutParams(ModernUi.dp(a,65),ModernUi.dp(a,36)));SeekBar slider=new SeekBar(a);slider.setMax((int)Math.round((c.max-c.min)/c.step));slider.setProgress((int)Math.round((Math.max(c.min,Math.min(c.max,parsed))-c.min)/c.step));slider.setEnabled(enabled);ModernUi.tint(slider);field.addView(slider,new LinearLayout.LayoutParams(0,ModernUi.dp(a,36),1));
                     slider.setOnFocusChangeListener((v,on)->{if(on)explain.accept(c);});slider.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener(){public void onProgressChanged(SeekBar bar,int value,boolean user){if(user){double n=c.min+value*c.step;draft.put(c.key,number(n));amount.setText(numericLabel(c,n));explain.accept(c);updatePending.run();}}public void onStartTrackingTouch(SeekBar b){explain.accept(c);}public void onStopTrackingTouch(SeekBar b){}});
-                    amount.setOnClickListener(v->{if(!enabled)return;explain.accept(c);EditText input=new EditText(a);input.setInputType(android.text.InputType.TYPE_CLASS_NUMBER|android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL|android.text.InputType.TYPE_NUMBER_FLAG_SIGNED);input.setText(draft.get(c.key));ModernUi.builder(a).setTitle(c.label+" ("+c.min+"–"+c.max+")").setView(input).setPositiveButton("Apply",(d,w)->{try{double n=Double.parseDouble(input.getText().toString());if(!Double.isFinite(n))throw new NumberFormatException();n=Math.max(c.min,Math.min(c.max,n));slider.setProgress((int)Math.round((n-c.min)/c.step));draft.put(c.key,number(c.min+slider.getProgress()*c.step));amount.setText(numericLabel(c,Double.parseDouble(draft.get(c.key))));updatePending.run();}catch(Exception e){Toast.makeText(a,"Enter a valid number.",Toast.LENGTH_SHORT).show();}}).setNegativeButton("Cancel",null).show();});
+                    amount.setOnClickListener(v->{if(!enabled)return;explain.accept(c);EditText input=new EditText(a);input.setInputType(android.text.InputType.TYPE_CLASS_NUMBER|android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL|android.text.InputType.TYPE_NUMBER_FLAG_SIGNED);input.setText(draft.get(c.key));ModernUi.builder(a).setTitle(EsUi.t(c.label)+" ("+c.min+"–"+c.max+")").setView(input).setPositiveButton("Apply",(d,w)->{try{double n=Double.parseDouble(input.getText().toString());if(!Double.isFinite(n))throw new NumberFormatException();n=Math.max(c.min,Math.min(c.max,n));slider.setProgress((int)Math.round((n-c.min)/c.step));draft.put(c.key,number(c.min+slider.getProgress()*c.step));amount.setText(numericLabel(c,Double.parseDouble(draft.get(c.key))));updatePending.run();}catch(Exception e){Toast.makeText(a,"Enter a valid number.",Toast.LENGTH_SHORT).show();}}).setNegativeButton("Cancel",null).show();});
                 }
                 row.setTag(c.key);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);lp.topMargin=ModernUi.dp(a,8);rows.addView(row,lp);
             }
@@ -238,6 +256,7 @@ final class MobileSettingsUi {
     private static String activeAa(Runtime runtime){try{org.json.JSONObject info=new org.json.JSONObject(runtime.get("gta4_session_stats"));return "Active AA: "+info.optString("aa","waiting for sample")+" · "+info.optInt("scene_samples",1)+" samples";}catch(Exception error){return "Active AA: waiting for sample";}}
     static String guide(String key){
         switch(key){
+            case "user_language":return "Selecciona el idioma del juego: español o inglés. Reinicia para aplicar los cambios.";
             case "gta4_disable_tlad_film_grain":return "Controls the existing Lost and Damned grain shader. Other episodes may not contain this effect.";
             case "gta4_native_output_dither":return "Adds subtle noise to reduce color banding at presentation. Off can reveal gradients; it is not a texture-quality setting.";
             case "ui_battery_refresh":return "Requests the lowest display refresh rate that matches the frame cap evenly, where Android supports it. Can reduce display power use. Off prefers the highest matching rate. The phone may decline a request.";
@@ -330,6 +349,7 @@ final class MobileSettingsUi {
     private static String number(double n){return java.math.BigDecimal.valueOf(n).setScale(3,java.math.RoundingMode.HALF_UP).stripTrailingZeros().toPlainString();}
     private static String numericLabel(Choice c,double n){if(c.key.equals("gta4_touch_context_delay_ms"))return Math.round(n)+" ms";if(c.key.contains("deadzone")||c.key.equals("gamepad_trigger_threshold")||c.key.equals("gamepad_rumble_strength"))return Math.round(n*100)+"%";if(c.key.equals("gta4_overlay_text_size"))return Math.round(n)+" sp";if(c.key.equals("gta4_overlay_edge_gap"))return Math.round(n)+" dp";if(c.key.equals("gta4_overlay_x")||c.key.equals("gta4_overlay_y"))return Math.round(n*100)+"%";if(c.key.equals("gta4_touch_aim_hold_seconds"))return Math.round(n*1000)+" ms";if(c.key.contains("opacity")||c.key.equals("gta4_phone_rumble_strength"))return Math.round(n*100)+"%";if(c.key.contains("smoothing"))return Math.round(n*1000)+" ms";if(c.key.contains("margin"))return number(n*100)+"%";return number(n)+"×";}
     private static String pretty(String key,String value){
+        if(key.equals("user_language"))return value.equals("5")?"Español":value.equals("1")?"English":value;
         if(key.equals("gta4_disable_tlad_film_grain"))return value.equals("true")?"Off":"On";
         if(key.equals("gta4_touch_radar_top"))return value.equals("true")?"Top left":"Original position";
         if(key.equals("gta4_phone_gyro_mode"))return value.equals("aim")?"Aim only":value.equals("always")?"Gameplay":"Off";
