@@ -197,16 +197,31 @@ final class S26GraphicsProfiles {
         apply(values,profile);
         if (!SUSTAINED_60.equals(profile) && !SUSTAINED_60_CITY.equals(profile)) return;
 
-        // System-driver thermal trial from PR #10, adapted to the v106 codebase
-        // so cheats, saves, sound and earlier driver fixes remain unchanged.
-        // Automatic resolves to System for the Exynos Xclipse GPU.
+        // v108: prioritize legible distant geometry instead of exchanging it
+        // for a higher headline FPS. Automatic uses the system Vulkan driver
+        // on the S26's Xclipse GPU; never force a driver switch.
         if ("system".equalsIgnoreCase(driverMode) || "auto".equalsIgnoreCase(driverMode)) {
-            values.put("gta4_native_shadow_interval", "2");
-            values.put("gta4_native_water_reflection_interval", "4");
-            values.put("gta4_native_environment_reflection_interval", "4");
+            // Undo invalid v107 enum values: "Sun shadows" supports 0/1,
+            // reflection intervals 0..3 in the current Android settings.
+            values.put("gta4_native_shadow_interval", "1");
+            values.put("gta4_native_water_reflection_interval", "3");
+            values.put("gta4_native_environment_reflection_interval", "3");
             values.put("gta4_native_max_queued_frames", "2");
-            if (SUSTAINED_60_CITY.equals(profile))
-                values.put("gta4_draw_distance_scale", "1.0");
+            // Keep the original 1080p OUTPUT/FSR Ultra Quality ratio to avoid
+            // a native 1080p heat spike, but reduce FSR softness.
+            values.put("gta4_fsr1_sharpness_reduction", "0.05");
+            // Draw objects further out and do not shrink the scene merely
+            // because frame delivery falls below 60 fps. Android thermal
+            // protection stays on and may still reduce detail when required.
+            values.put("gta4_draw_distance_scale",
+                    SUSTAINED_60_CITY.equals(profile) ? "1.15" : "1.10");
+            values.put("gta4_dynamic_draw_distance", "false");
+            // Reuse converted textures while memory is available; reclamation
+            // remains controlled by the native renderer's memory pressure.
+            values.put("gta4_native_texture_reuse_extended", "true");
+            // Compensate only with edge pass quality, not with textures,
+            // geometry, near-field shadows or output resolution.
+            values.put("gta4_native_smaa_quality", "medium");
             return;
         }
         if (!usesExperimentalRadv(driverMode)) return;

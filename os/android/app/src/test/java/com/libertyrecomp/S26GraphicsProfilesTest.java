@@ -149,46 +149,48 @@ public class S26GraphicsProfilesTest {
         assertTrue(S26GraphicsProfiles.usesExperimentalRadv("custom:radv-xclipse-v1.9"));
     }
 
-    @Test public void systemOrAutoAppliesPr10ThermalTestOnlyWhenSelectingSustained() {
+    @Test public void systemAndAutoPrioritiseVisibleCityWithoutInvalidOptionValues() {
         for (String mode:new String[]{"auto","system"}) {
-            Map<String,String> baseline=new LinkedHashMap<>(),tuned=new LinkedHashMap<>();
-            S26GraphicsProfiles.apply(baseline,S26GraphicsProfiles.SUSTAINED_60);
+            Map<String,String> tuned=new LinkedHashMap<>();
+            tuned.put("unrelated_setting","preserved");
             S26GraphicsProfiles.applyForDriver(tuned,S26GraphicsProfiles.SUSTAINED_60,mode);
             assertEquals("60",tuned.get("gta4_frame_limit"));
             assertEquals("1080p",tuned.get("resolution"));
             assertEquals("fsr1",tuned.get("gta4_native_upscaler"));
-            assertEquals("0.9",tuned.get("gta4_draw_distance_scale"));
-            assertEquals("true",tuned.get("gta4_dynamic_draw_distance"));
-            assertEquals("2",tuned.get("gta4_native_shadow_interval"));
-            assertEquals("4",tuned.get("gta4_native_water_reflection_interval"));
-            assertEquals("4",tuned.get("gta4_native_environment_reflection_interval"));
+            assertEquals("ultra_quality",tuned.get("gta4_fsr1_quality"));
+            assertEquals("0.05",tuned.get("gta4_fsr1_sharpness_reduction"));
+            assertEquals("1.10",tuned.get("gta4_draw_distance_scale"));
+            assertEquals("false",tuned.get("gta4_dynamic_draw_distance"));
+            assertEquals("1",tuned.get("gta4_native_shadow_interval"));
+            assertEquals("3",tuned.get("gta4_native_water_reflection_interval"));
+            assertEquals("3",tuned.get("gta4_native_environment_reflection_interval"));
             assertEquals("2",tuned.get("gta4_native_max_queued_frames"));
+            assertEquals("true",tuned.get("gta4_native_texture_reuse_extended"));
+            assertEquals("medium",tuned.get("gta4_native_smaa_quality"));
+            assertEquals("512",tuned.get("gta4_shadow_map_base_size"));
             assertEquals("32",tuned.get("audio_maxqframes"));
             assertEquals("true",tuned.get("android_thermal_guard"));
             assertEquals("false",tuned.get("android_gpu_turbo"));
             assertFalse(tuned.containsKey("ui_sustained"));
             assertFalse(tuned.containsKey("ui_battery_refresh"));
-            baseline.remove("gta4_native_shadow_interval");
-            baseline.remove("gta4_native_water_reflection_interval");
-            baseline.remove("gta4_native_environment_reflection_interval");
-            baseline.remove("gta4_native_max_queued_frames");
-            tuned.remove("gta4_native_shadow_interval");
-            tuned.remove("gta4_native_water_reflection_interval");
-            tuned.remove("gta4_native_environment_reflection_interval");
-            tuned.remove("gta4_native_max_queued_frames");
-            assertEquals(baseline,tuned);
+            assertEquals("preserved",tuned.get("unrelated_setting"));
         }
     }
 
-    @Test public void systemCityVisibleAppliesPr10DistanceWithoutChangingSoundOrFsr() {
+    @Test public void systemCityVisibleKeepsExtraDistanceAndStreamingSafety() {
         Map<String,String> tuned=new LinkedHashMap<>();
         S26GraphicsProfiles.applyForDriver(tuned,S26GraphicsProfiles.SUSTAINED_60_CITY,"system");
-        assertEquals("1.0",tuned.get("gta4_draw_distance_scale"));
-        assertEquals("60",tuned.get("gta4_frame_limit"));
+        assertEquals("1.15",tuned.get("gta4_draw_distance_scale"));
+        assertEquals("false",tuned.get("gta4_dynamic_draw_distance"));
+        assertEquals("0.05",tuned.get("gta4_fsr1_sharpness_reduction"));
         assertEquals("ultra_quality",tuned.get("gta4_fsr1_quality"));
-        assertEquals("true",tuned.get("gta4_dynamic_draw_distance"));
-        assertEquals("2",tuned.get("gta4_native_max_queued_frames"));
+        assertEquals("true",tuned.get("gta4_native_converted_texture_disk_cache"));
+        assertEquals("true",tuned.get("gta4_native_texture_reuse_extended"));
+        assertEquals("1",tuned.get("gta4_native_shadow_interval"));
+        assertEquals("3",tuned.get("gta4_native_water_reflection_interval"));
+        assertEquals("3",tuned.get("gta4_native_environment_reflection_interval"));
         assertEquals("32",tuned.get("audio_maxqframes"));
+        assertEquals("true",tuned.get("android_thermal_guard"));
     }
 
     @Test public void highAndUltraRemainUnchangedForSystemDriver() {
