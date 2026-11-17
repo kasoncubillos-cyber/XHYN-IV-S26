@@ -68,10 +68,13 @@ public class S26GraphicsProfilesTest {
         S26GraphicsProfiles.apply(stable,S26GraphicsProfiles.SUSTAINED_60);
         S26GraphicsProfiles.apply(city,S26GraphicsProfiles.SUSTAINED_60_CITY);
         assertEquals("0.9",stable.get("gta4_draw_distance_scale"));
-        assertEquals("1.05",city.get("gta4_draw_distance_scale"));
-        stable.remove("gta4_draw_distance_scale");
-        city.remove("gta4_draw_distance_scale");
-        assertEquals(stable,city);
+        assertEquals("1.0",city.get("gta4_draw_distance_scale"));
+        assertEquals("2",city.get("gta4_native_shadow_interval"));
+        assertEquals("4",city.get("gta4_native_water_reflection_interval"));
+        assertEquals("4",city.get("gta4_native_environment_reflection_interval"));
+        assertEquals("2",city.get("gta4_native_max_queued_frames"));
+        assertEquals("true",city.get("android_thermal_guard"));
+        assertEquals("60",stable.get("gta4_frame_limit"));
         assertEquals("60",city.get("gta4_frame_limit"));
         assertEquals("true",city.get("gta4_dynamic_draw_distance"));
         assertEquals("true",city.get("android_thermal_guard"));
