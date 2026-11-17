@@ -115,6 +115,7 @@ final class MobileSettingsUi {
         new Choice("android_perf_hint","Android performance hints","true",true,"true","false"),
         new Choice("android_thermal_guard","Thermal Guard","false",false,"true","false"),
         new Choice("android_gpu_turbo","GPU Turbo","false",true,"true","false"),
+        new Choice("audio_maxqframes","Audio queue depth","32",true,"32","40","48"),
         new Choice("audio_adaptive_buffer","Audio dropout protection","true",false,"true","false"),
         new Choice("audio_mute","Mute audio","false",false,"false","true"),
         new Choice("audio_low_latency","Low-latency audio","false",true,"false","true")
@@ -200,6 +201,11 @@ final class MobileSettingsUi {
             if(selected[0].equals("Graphics")&&query.isEmpty()){
                 // Show the latest player-tested profiles first; keep old profiles usable in code,
                 // but remove their redundant one-tap tiles from this launcher.
+                ModernUi.gridAction(a,rows,"S26 sesión larga · audio estable",()->ModernUi.builder(a)
+                    .setTitle("Sesión larga · menos calor y menos cortes de audio")
+                    .setMessage("Perfil experimental de diagnóstico para las caídas después de jugar un rato. Conserva salida 1080p, FSR1 Ultra Quality, SMAA alto y distancia de ciudad 1,05x; intenta reducir la carga sostenida. Activa protección térmica y búfer de audio adaptativo, desactiva baja latencia y GPU Turbo. Aumenta ligeramente la cola de audio, con posible retraso adicional de sonido (~43 ms). No puede impedir la limitación térmica del teléfono ni garantiza 60 FPS. Guarda y reinicia para probarlo.")
+                    .setNegativeButton("Cancelar",null)
+                    .setPositiveButton("Probar sesión larga",(d,w)->{S26GraphicsProfiles.apply(draft,S26GraphicsProfiles.LONG_SESSION_AUDIO);if(sustainedSupported(a))draft.put("ui_sustained","true");updatePending.run();render[0].run();}).show());
                 ModernUi.gridAction(a,rows,"S26 60 FPS ciudad visible",()->ModernUi.builder(a)
                     .setTitle("60 FPS · Ciudad más visible")
                     .setMessage("Versión experimental del perfil 60 FPS sostenidos para reducir la aparición tardía de edificios al conducir rápido. Mantiene 1080p de salida, FSR 1 Ultra Quality, SMAA Alto, protección térmica y límite de 60 FPS. Aumenta solo la distancia de dibujado de 0,90× a 1,05×; exige algo más de CPU/GPU y podría causar nuevas caídas si el teléfono se calienta. Mantiene la distancia adaptable, que puede reducir el detalle lejano bajo carga. Guarda y reinicia, y compara con el perfil anterior.")
@@ -292,6 +298,7 @@ final class MobileSettingsUi {
             case "android_perf_hint":return "Lets Android schedule work against the selected frame target. Device support varies. This is a hint, not a guarantee of faster clocks.";
             case "android_thermal_guard":return "When sustained thermal pressure is detected, temporarily reduces draw distance and backs off GPU Turbo. Restores after the phone stays cool. Can trade detail for steadier sustained play.";
             case "android_gpu_turbo":return "Requests more GPU performance where the device permits it. Can increase heat and power use; Thermal Guard can back it off under pressure.";
+            case "audio_maxqframes":return "Maximum guest audio queue: 32 blocks ~171 ms, 40 ~213 ms, 48 ~256 ms. A larger queue can absorb short stalls when the game heats up, at the cost of audio latency. It cannot fix sustained throttling; restart required.";
             case "audio_adaptive_buffer":return "After audio runs out, rebuilds about 11 ms of audio before resuming. Can reduce repeated crackling during brief stalls with a small delay. It cannot recover audio the game never produced.";
             case "audio_mute":return "Mutes the game's audio output.";
             case "audio_low_latency":return "Uses shorter audio buffering after restart. May increase crackling when the game misses audio deadlines. Leave off when troubleshooting dropouts.";
