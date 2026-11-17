@@ -216,4 +216,4 @@ jobs:
             --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
             --title "XHYN IV S26 v106 - RADV 1.9 experimental clarity" \
             --prerelease --notes-file out/v106-notes.md
-          echo "APK directa: https://github.com/$GITHUB_REPOSITORY/releases/download/$TAG/XHYN-IV-S26-sostenido-audio-v105.apk" >> "$GITHUB_STEP_SUMMARY"
+          echo "APK directa: https://github.com/$GITHUB_REPOSITORY/releases/download/$TAG/XHYN-IV-S26-radv19-claridad-v106.apk" >> "$GITHUB_STEP_SUMMARY"
