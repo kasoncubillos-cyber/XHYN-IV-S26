@@ -1,65 +1,78 @@
-# S26 — Prueba de sesiones largas, FPS y audio
+# XHYN IV S26 — Mejorar el perfil existente «60 FPS sostenidos»
 
-## Problema informado
+## Instrucción del usuario
+El propietario **no quiere otro modo**: quiere mejorar directamente el preset
+`S26 60 FPS sostenidos` que utiliza habitualmente, conservando el estilo visual
+y los trucos ya funcionales en el menú MOD de la aplicación. No reabrir la
+integración opcional de trucos en el teléfono de Niko como requisito de esta tarea.
 
-En Samsung Galaxy S26, el usuario indica buena imagen y FPS al comienzo de GTA IV, pero
-después de un rato el teléfono se calienta, bajan fuertemente los cuadros y el audio
-se distorsiona. Los trucos en el menú de la aplicación ya funcionan y deben conservarse.
+## Problema que queremos resolver
+En Galaxy S26, GTA IV se ve y funciona bien al comenzar. Después de jugar un rato,
+el teléfono se calienta y aparecen caídas fuertes de FPS y distorsión del audio.
 
-La coincidencia temporal es compatible con **limitación térmica** y con **subalimentación
-de audio** al incumplir plazos de procesamiento. Aún no está demostrado cuál es
-el cuello de botella: CPU, GPU, hilo de audio, memoria o streaming. No hay datos de
-FPS, duración, estado térmico ni registros de underrun aportados para el momento de la caída.
+La sincronía entre calor y caída de FPS es compatible con *thermal throttling*,
+pero la causa aún no se ha confirmado mediante mediciones. La distorsión sonora
+también puede relacionarse con interrupciones del productor de audio por
+sobrecarga general. No se han medido el consumo, los FPS en frío/caliente ni
+las pérdidas de bloques de audio en el dispositivo.
 
-## Cambios de código de esta rama
+## Cambios realizados en ESTA rama
+Se modifica el preset **existente** `SUSTAINED_60` de
+`S26GraphicsProfiles.apply`; no se añade otro preset ni otro botón.
 
-- Perfil experimental **S26 sesión larga · audio estable**, derivado de
-  `SUSTAINED_60_CITY`.
-- Salida 1080p, FSR1 Ultra Quality (menos píxeles internos), SMAA High,
-  sombras 512, draw distance 1.05×, distancia adaptable y cap objetivo 60 FPS.
-- GPU Turbo desactivado y Thermal Guard habilitado (sin anular protecciones Android).
-- Audio adaptativo activado, low-latency desactivado y límite de cola
-  `audio_maxqframes=40` (frente a 32 por defecto en Android).
-- `ui_battery_refresh=true`; el menú activa `ui_sustained` únicamente si Android
-  informa compatibilidad. No se fuerza el modo en dispositivos no compatibles.
-- Se añade un control individual de profundidad de cola para pruebas 32/40/48.
+Se mantienen sus ajustes gráficos originales:
+- Límite objetivo 60 FPS (no garantía frente a calor).
+- Salida 1080p; FSR1 Ultra Quality con menos píxeles internos.
+- SMAA High, sombras 512, refresco de reflejos reducido, distancia
+  de dibujado `0.9`, distancia dinámica y cachés actuales.
+- `android_thermal_guard=true`; `android_gpu_turbo=false`.
 
-Cada bloque de audio del motor es de 256 muestras a 48 kHz (~5,33 ms).
-Por tanto, 32/40/48 bloques equivalen a unos 171/213/256 ms de profundidad máxima.
-El cambio 32→40 añade hasta ~43 ms de latencia, lo que podría perjudicar la sincronía
-audio-video. Es una prueba reversible, **no una corrección garantizada**. El
-sistema de recarga adaptativa existente tampoco puede producir audio que el juego
-no alcanza a generar.
+Se añaden **en el mismo preset**:
+- `audio_maxqframes=40` (Android utilizaba 32 por defecto en el motor).
+- `audio_adaptive_buffer=true`.
+- `audio_low_latency=false`.
+- `ui_battery_refresh=true`.
+- El botón «S26 60 FPS sostenidos» solicita `ui_sustained=true` solo si
+  Android declara el modo compatible, sin forzarlo cuando no es compatible.
 
-## Comprobación en el teléfono (sin instalación de una versión nueva)
+El perfil `SUSTAINED_60_CITY` hereda automáticamente esos cambios y conserva
+su única diferencia visual, distancia de dibujado `1.05` en vez de `0.9`.
 
-El juego actual tiene las opciones equivalentes configurables manualmente:
+La opción nueva de «Sesión larga» creada inicialmente en esta PR fue **retirada**
+porque el usuario quiere actualizar el modo que ya usa. La profundidad de
+búfer de audio (32, 40 o 48) sigue disponible en ajustes avanzados
+para poder revertir/diagnosticar cortes.
 
-1. Gráficos → `S26 60 FPS ciudad visible` (o `S26 60 FPS sostenidos` si la
-   distancia lejana sigue causando caídas).
-2. Rendimiento → Thermal Guard ON, GPU Turbo OFF,
-   Sustained performance ON solo si el teléfono lo admite,
-   Lower display refresh ON.
-3. Audio → Audio dropout protection ON y Low-latency audio OFF.
-4. Overlay → Performance overlay Detailed y Overlay thermal metric ON.
-5. Dejar enfriar, jugar 5 minutos sin carga conectada y anotar FPS/severidad;
-   repetir tras 15-20 minutos en una zona comparable.
-6. Si el audio sigue distorsionado, reproducir el problema con el
-   registro de diagnóstico habilitado y exportar el informe sin incluir datos
-   personales ni archivos comerciales del juego.
+## Compromisos y límites
+La cola de 40 bloques de 256 muestras a 48 kHz equivale a unos 213 ms de
+profundidad máxima, frente a unos 171 ms con 32. Puede absorber tirones breves,
+pero potencialmente añade hasta unos 43 ms de latencia sonora.
+No puede resolver saturación continua del motor ni evitar que Android reduzca
+frecuencias por temperaturas altas.
 
-**NO** se debe forzar GPU Turbo, desactivar protección térmica ni mantener el equipo
-jugando si aparece advertencia grave de temperatura. Tampoco se deben interpretar
-etiquetas `Moderate`/`Severe` como grados Celsius. Si los FPS se desploman
-solo con calor y se recuperan al enfriar, se refuerza la hipótesis térmica.
+No reducir agresivamente distancia de visión, detalle de vehículos ni resolución
+de salida: el usuario ya se quejó de los autos y caminos cuadrados a lo lejos.
+En pruebas futuras, usar valores medidos de FPS, severidad térmica y audio
+para decidir si deben cambiarse sombras/reflejos, procesamiento de gráficos o
+cuellos de botella del sonido.
 
-## Para distribuir una actualización real
+## Comprobación antes de APK
+1. Ejecutar `:app:testDebugUnitTest` con los tests de `S26GraphicsProfilesTest`,
+   incluyendo igualdad entre la versión ciudad y el modo original excepto
+   la distancia de visión.
+2. Confirmar que el botón actual de «60 FPS sostenidos» se conserva y que
+   los ajustes de audio se aplican al guardar/reiniciar. No debe aparecer un
+   nuevo mosaico de modo «Sesión larga».
+3. Asegurar que se conserva el menú MOD de trucos funcionando en la versión
+   instalada; integrar sobre una base de código compatible con esa entrega.
+4. Compilar sin borrar juegos/partidas, verificar mismo paquete
+   `com.kasoncubillos.xhynivs26stable`, certificado idéntico al de la
+   versión del usuario y `versionCode` incrementado en la futura entrega.
+5. Test en Galaxy S26 con overlay FPS + estado térmico durante 5 y 15-20
+   minutos, sin jugar conectado al cargador, y revisar la sincronía de audio.
+6. Si los FPS bajan solo después de calentarse, registrar los indicadores
+   sin anular Thermal Guard, protecciones del dispositivo ni forzar GPU Turbo.
 
-- No publicar ni firmar esta rama mientras el usuario no haya probado la
-  combinación actual y revisado FPS, temperatura y audio.
-- Conservar `com.kasoncubillos.xhynivs26stable` y la clave de firma que instala
-  encima de v102/v104, sin reinstalación ni borrado de datos.
-- Incrementar `versionCode` solamente al preparar una entrega validada.
-- Comparar certificados de APK y efectuar una prueba real de instalación encima.
-- Ejecutar `:app:testDebugUnitTest` y compilación/paquete compatible; este PR
-  contiene solo ajustes Java y pruebas, y no es una APK nueva.
+## Estado
+Solo es una **propuesta de código en PR en borrador**. No se ha publicado
+APK actualizada, ni demostrado una mejora real en sesión larga.
