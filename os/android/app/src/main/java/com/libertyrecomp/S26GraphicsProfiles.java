@@ -172,14 +172,11 @@ final class S26GraphicsProfiles {
                 values.put("gta4_native_max_queued_frames", "3");
                 values.put("android_gpu_turbo", "false");
                 values.put("android_thermal_guard", "true");
-                // Keep the original sustained visuals. Protect sound during
-                // short frame-time spikes and prefer the normal-latency path.
-                // A 40-block guest queue adds up to ~43 ms versus 32 blocks.
-                // It cannot restore CPU/GPU speed lost to thermal throttling.
-                values.put("audio_maxqframes", "40");
+                // Roll back v105's unsuccessful 40-block sound experiment.
+                // This does not fix CPU/GPU starvation but avoids extra latency.
+                values.put("audio_maxqframes", "32");
                 values.put("audio_adaptive_buffer", "true");
                 values.put("audio_low_latency", "false");
-                values.put("ui_battery_refresh", "true");
                 break;
             case SUSTAINED_60_CITY:
                 // Keep the proven cooler 60-FPS settings of v101, with a small
@@ -190,6 +187,39 @@ final class S26GraphicsProfiles {
                 break;
             default: throw new AssertionError(profile);
         }
+    }
+
+    /**
+     * Optional, deliberately user-selected RADV Xclipse trial. Never automatically
+     * change graphics or drivers on installation or on app start.
+     */
+    static void applyForDriver(Map<String,String> values, String profile, String driverMode) {
+        apply(values,profile);
+        if (!usesExperimentalRadv(driverMode) ||
+                (!SUSTAINED_60.equals(profile) && !SUSTAINED_60_CITY.equals(profile))) return;
+
+        // RADV experiment: prioritize recognisable distant buildings/vehicles.
+        // FSR1 still works below native output resolution, but less softening
+        // makes its upscaled output sharper without increasing render pixels.
+        values.put("gta4_fsr1_sharpness_reduction", "0.05");
+        // The v105 dynamic-distance loop repeatedly decreased distant geometry
+        // under load. A fixed near-retail distance is a controlled comparison
+        // to assess pop-in; may draw more scenery and increase CPU/battery use.
+        values.put("gta4_draw_distance_scale", "1.05");
+        values.put("gta4_dynamic_draw_distance", "false");
+        // Offset part of the larger scene cost with less expensive effects.
+        // Do not change resolution, native game engine or cap above 60 FPS.
+        values.put("gta4_shadow_map_base_size", "256");
+        values.put("gta4_native_smaa_quality", "medium");
+    }
+
+    static boolean usesExperimentalRadv(String mode) {
+        if (mode==null) return false;
+        String lower=mode.trim().toLowerCase(java.util.Locale.ROOT);
+        // The ZIP import uses custom:<meta-name-or-zip-name>, not 'radv18'.
+        // Explicitly exclude the bundled 1.8 driver and all system modes.
+        return lower.startsWith("custom:") && lower.contains("radv") &&
+                lower.contains("xclipse");
     }
 
     private S26GraphicsProfiles() {}
