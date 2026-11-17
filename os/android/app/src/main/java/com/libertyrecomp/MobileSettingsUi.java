@@ -115,7 +115,7 @@ final class MobileSettingsUi {
         new Choice("android_perf_hint","Android performance hints","true",true,"true","false"),
         new Choice("android_thermal_guard","Thermal Guard","false",false,"true","false"),
         new Choice("android_gpu_turbo","GPU Turbo","false",true,"true","false"),
-        new Choice("audio_maxqframes","Audio queue depth","32",true,"32","40","48"),
+        new Choice("audio_maxqframes","Búfer de audio","32",true,"32","40","48"),
         new Choice("audio_adaptive_buffer","Audio dropout protection","true",false,"true","false"),
         new Choice("audio_mute","Mute audio","false",false,"false","true"),
         new Choice("audio_low_latency","Low-latency audio","false",true,"false","true")
@@ -201,21 +201,16 @@ final class MobileSettingsUi {
             if(selected[0].equals("Graphics")&&query.isEmpty()){
                 // Show the latest player-tested profiles first; keep old profiles usable in code,
                 // but remove their redundant one-tap tiles from this launcher.
-                ModernUi.gridAction(a,rows,"S26 sesión larga · audio estable",()->ModernUi.builder(a)
-                    .setTitle("Sesión larga · menos calor y menos cortes de audio")
-                    .setMessage("Perfil experimental de diagnóstico para las caídas después de jugar un rato. Conserva salida 1080p, FSR1 Ultra Quality, SMAA alto y distancia de ciudad 1,05x; intenta reducir la carga sostenida. Activa protección térmica y búfer de audio adaptativo, desactiva baja latencia y GPU Turbo. Aumenta ligeramente la cola de audio, con posible retraso adicional de sonido (~43 ms). No puede impedir la limitación térmica del teléfono ni garantiza 60 FPS. Guarda y reinicia para probarlo.")
-                    .setNegativeButton("Cancelar",null)
-                    .setPositiveButton("Probar sesión larga",(d,w)->{S26GraphicsProfiles.apply(draft,S26GraphicsProfiles.LONG_SESSION_AUDIO);if(sustainedSupported(a))draft.put("ui_sustained","true");updatePending.run();render[0].run();}).show());
                 ModernUi.gridAction(a,rows,"S26 60 FPS ciudad visible",()->ModernUi.builder(a)
                     .setTitle("60 FPS · Ciudad más visible")
-                    .setMessage("Versión experimental del perfil 60 FPS sostenidos para reducir la aparición tardía de edificios al conducir rápido. Mantiene 1080p de salida, FSR 1 Ultra Quality, SMAA Alto, protección térmica y límite de 60 FPS. Aumenta solo la distancia de dibujado de 0,90× a 1,05×; exige algo más de CPU/GPU y podría causar nuevas caídas si el teléfono se calienta. Mantiene la distancia adaptable, que puede reducir el detalle lejano bajo carga. Guarda y reinicia, y compara con el perfil anterior.")
+                    .setMessage("Versión experimental del perfil 60 FPS sostenidos para reducir la aparición tardía de edificios al conducir rápido. Mantiene 1080p de salida, FSR 1 Ultra Quality, SMAA Alto, protección térmica y límite de 60 FPS. Aumenta solo la distancia de dibujado de 0,90× a 1,05×; exige algo más de CPU/GPU y podría causar nuevas caídas si el teléfono se calienta. Mantiene la distancia adaptable y hereda los ajustes de sonido del modo sostenido: búfer adaptativo y cola de audio con un poco más de margen para tirones breves. Guarda y reinicia; la temperatura puede seguir limitando los FPS.")
                     .setNegativeButton("Cancelar",null)
-                    .setPositiveButton("Probar ciudad visible",(d,w)->{S26GraphicsProfiles.apply(draft,S26GraphicsProfiles.SUSTAINED_60_CITY);updatePending.run();render[0].run();}).show());
+                    .setPositiveButton("Probar ciudad visible",(d,w)->{S26GraphicsProfiles.apply(draft,S26GraphicsProfiles.SUSTAINED_60_CITY);if(sustainedSupported(a))draft.put("ui_sustained","true");updatePending.run();render[0].run();}).show());
                 ModernUi.gridAction(a,rows,"S26 60 FPS sostenidos",()->ModernUi.builder(a)
                     .setTitle("Objetivo: 60 FPS")
-                    .setMessage("Prioriza 60 FPS durante sesiones largas, persecuciones y conducción rápida. Conserva salida a 1080p, pero usa FSR 1 Ultra Quality (menos píxeles internos y una pequeña pérdida de nitidez frente a nativo), SMAA Alto y sombras de 512. Reduce la frecuencia de reflejos y el escenario lejano para limitar el calentamiento. Mantiene el límite de 60 FPS, pero no garantiza alcanzarlos si la CPU/GPU se ralentiza por temperatura. No desactiva las protecciones del teléfono. Guarda los cambios y reinicia.")
+                    .setMessage("Prioriza 60 FPS durante sesiones largas, persecuciones y conducción rápida. Conserva salida a 1080p, pero usa FSR 1 Ultra Quality (menos píxeles internos y una pequeña pérdida de nitidez frente a nativo), SMAA Alto y sombras de 512. Reduce la frecuencia de reflejos y el escenario lejano para limitar el calentamiento. Ahora incorpora el búfer adaptativo de audio, desactiva la baja latencia y amplía la cola de audio para reducir cortes breves durante tirones; podría retrasar ligeramente el sonido (hasta unos 43 ms adicionales). Mantiene protección térmica y GPU Turbo desactivado. No garantiza 60 FPS si el equipo se calienta. Guarda los cambios y reinicia.")
                     .setNegativeButton("Cancelar",null)
-                    .setPositiveButton("Seleccionar 60 FPS",(d,w)->{S26GraphicsProfiles.apply(draft,S26GraphicsProfiles.SUSTAINED_60);updatePending.run();render[0].run();}).show());
+                    .setPositiveButton("Seleccionar 60 FPS",(d,w)->{S26GraphicsProfiles.apply(draft,S26GraphicsProfiles.SUSTAINED_60);if(sustainedSupported(a))draft.put("ui_sustained","true");updatePending.run();render[0].run();}).show());
                 ModernUi.gridAction(a,rows,"S26 Ultra conducción fluida",()->ModernUi.builder(a)
                     .setTitle("Ultra conducción fluida")
                     .setMessage("Pensado para recorrer Liberty City rápidamente y sesiones prolongadas. Mantiene 1080p nativos, SMAA Ultra y sombras de alta calidad; limita algo el escenario lejano (1,2× en vez de 1,4×) y actualiza los reflejos cada dos fotogramas para reducir carga. Activa caché y preparación de efectos, desactiva GPU Turbo, conserva la protección térmica y el límite de FPS seleccionado. No garantiza mantener 60 FPS si el teléfono se calienta.")
