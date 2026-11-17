@@ -278,6 +278,7 @@ public class LauncherActivity extends Activity {
         LinearLayout drivers=new LinearLayout(this);drivers.setOrientation(LinearLayout.VERTICAL);
         drivers.addView(ModernUi.text(this,"Applies next time you play.",13,ModernUi.MUTED));
         ModernUi.action(this,drivers,"Import driver ZIP",this::pickDriverZip);
+        ModernUi.action(this,drivers,"RADV Xclipse · corregir cuadros negros (prueba)",this::showRadvCompatibility);
         ModernUi.action(this,drivers,"Advanced Turnip options",()->TurnipSettingsUi.show(this,mDataRoot,gameRunning()));
         mDrivers=new RadioGroup(this);mDrivers.setOnCheckedChangeListener((group,id)->onDriverChecked(id));drivers.addView(mDrivers);
         mDriverNote=ModernUi.text(this,"",13,ModernUi.MUTED);drivers.addView(mDriverNote);
@@ -303,6 +304,39 @@ public class LauncherActivity extends Activity {
         setBusy(true,"Preparing achievement metadata...");
         new Thread(()->{String error=Installer.prepareAchievements(this,mDataRoot);mMain.post(()->{progress.dismiss();if(isFinishing()||isDestroyed())return;setBusy(false,null);refreshAchievementSummary();if(error==null||error.isEmpty())showAchievements();else toast(error);});},"PrepareAchievements").start();
     }
+    /** Explicit reversible experiment: never automatically adjust any driver. */
+    private void showRadvCompatibility() {
+        if(gameRunning()){toast("Cierra el juego antes de cambiar las opciones de RADV.");return;}
+        final String mode=DriverState.readChoice(mDataRoot);
+        if(!mode.startsWith("custom:") || !mode.toLowerCase(Locale.ROOT).contains("radv")) {
+            toast("Selecciona primero el RADV Xclipse importado.");
+            return;
+        }
+        final String[] values={
+            RadvXclipseDccPolicy.DEFAULT,
+            RadvXclipseDccPolicy.SMALL_OFF,
+            RadvXclipseDccPolicy.ALL_OFF
+        };
+        final String[] labels={
+            "Normal (sin cambios)",
+            "Prueba A: desactivar compresión de objetivos pequeños",
+            "Prueba B: desactivar toda la compresión DCC"
+        };
+        try {
+            String selected=DriverState.options(mDataRoot,mode)
+                .getOrDefault(RadvXclipseDccPolicy.OPTION,RadvXclipseDccPolicy.DEFAULT);
+            int pos=java.util.Arrays.asList(values).indexOf(selected);
+            ModernUi.choose(this,"RADV Xclipse · compatibilidad experimental",labels,Math.max(pos,0),i->{
+                try {
+                    java.util.Map<String,String> update=new java.util.LinkedHashMap<>();
+                    update.put(RadvXclipseDccPolicy.OPTION,values[i]);
+                    DriverState.saveOptions(mDataRoot,mode,update);
+                    toast("Guardado. Reinicia el juego para probar; vuelve a Normal si empeora.");
+                }catch(IOException error){toast("No se pudo guardar: "+error.getMessage());}
+            });
+        }catch(IOException error){toast("No se pudo leer la opción de RADV: "+error.getMessage());}
+    }
+
     private void showDriverPanel(){showPanel("Graphics driver",mDriverPanel);}
     private void showFilesPanel(){showPanel("Game files & saves",mFilesPanel);}
     private void showPanel(String title,View panel){
