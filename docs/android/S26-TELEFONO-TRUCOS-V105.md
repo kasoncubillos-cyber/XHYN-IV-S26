@@ -79,7 +79,14 @@ la arquitectura y hashes de las bibliotecas. No crea, firma ni sube APK.
 
 El primer intento local de `build_native.sh 2` se detuvo antes de configurar:
 `no NDK at /home/agent/Android/Sdk/ndk/29.0.14206865`.
-El build remoto y sus resultados deben registrarse antes de considerar listo v105.
+El [build remoto completo](https://github.com/kasoncubillos-cyber/XHYN-IV-S26/actions/runs/43982560594)
+terminó correctamente el 17-11-2026 a las 00:11 UTC para el commit `ea1cbd2f`:
+compilación/enlace del motor, proxy Vulkan y registro de bibliotecas aprobados.
+`libmain.so` fue identificado como ELF 64-bit ARM aarch64 y su SHA-256 fue
+`65da870840cd8c77c90cd5a2a772c31f592ebe3331edcc1d55f0d1a2f28d1a3c`.
+Los logs confirman la compilación de `gta4_quicksave_hooks.cpp` desde esta rama.
+No se creó, firmó ni distribuyó ninguna APK. Esto completa el build, pero no la
+validación funcional del teléfono dentro del juego.
 No usar el workflow firmado `s26-updates-signed.yml` para transportar este cambio:
 reutiliza bibliotecas Alpha1, que no contienen la integración C++.
 
