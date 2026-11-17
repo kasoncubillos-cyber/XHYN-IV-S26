@@ -1,0 +1,65 @@
+name: S26 APK experimental sin publicación
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  experimental-apk:
+    name: Compilar APK experimental (sin publicar)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 95
+    steps:
+      - name: Checkout experimental branch
+        uses: actions/checkout@v4
+        with:
+          ref: feature/s26-thermal-sostenido-system-driver
+          submodules: false
+          persist-credentials: false
+      - name: JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - name: Dependencias Android
+        run: |
+          set -euo pipefail
+          sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+          git submodule update --init glue/rexglue-sdk-main/thirdparty/sdl3
+          echo "ANDROID_SDK_ROOT=$ANDROID_HOME" >> "$GITHUB_ENV"
+      - name: Pruebas de regresión Android
+        working-directory: os/android
+        run: ./gradlew --no-daemon --max-workers=2 :app:testDebugUnitTest
+      - name: Obtener motor nativo de referencia verificado
+        run: |
+          set -euo pipefail
+          mkdir -p out
+          curl -fL --retry 3 --retry-delay 3 \
+            "https://github.com/$GITHUB_REPOSITORY/releases/download/s26-alpha1/XHYN-IV-S26-Alpha1-signed.apk" \
+            -o out/verified-native-baseline.apk
+          echo "001fc241290931c7817c9db19d3e77ec0589b8dfa34d80429646ae077c86b43b  out/verified-native-baseline.apk" | sha256sum -c -
+      - name: Empaquetar APK sin firma
+        run: |
+          set -euo pipefail
+          python3 os/android/scripts/package_release.py \
+            --native-apk out/verified-native-baseline.apk \
+            --native-apk-sha256 001fc241290931c7817c9db19d3e77ec0589b8dfa34d80429646ae077c86b43b \
+            --unsigned \
+            --output out/XHYN-IV-S26-thermal-test-unsigned.apk
+          test -s out/XHYN-IV-S26-thermal-test-unsigned.apk
+          sha256sum out/XHYN-IV-S26-thermal-test-unsigned.apk > out/SHA256.txt
+      - name: Guardar artefacto privado, sin release
+        uses: actions/upload-artifact@v4
+        with:
+          name: S26-thermal-test-unsigned
+          path: |
+            out/XHYN-IV-S26-thermal-test-unsigned.apk
+            out/SHA256.txt
+          retention-days: 7
+          if-no-files-found: error
