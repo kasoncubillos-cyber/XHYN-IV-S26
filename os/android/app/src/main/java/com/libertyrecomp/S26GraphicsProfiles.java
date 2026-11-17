@@ -178,7 +178,13 @@ final class S26GraphicsProfiles {
                 // improvement to distant building visibility during fast driving.
                 // The adaptive draw distance may still reduce it under load.
                 apply(values, SUSTAINED_60);
-                values.put("gta4_draw_distance_scale", "1.05");
+                values.put("gta4_draw_distance_scale", "1.0");
+                // Trial for the reported five-minute sustained slowdown with
+                // the system driver; never disable thermal protections.
+                values.put("gta4_native_shadow_interval", "2");
+                values.put("gta4_native_water_reflection_interval", "4");
+                values.put("gta4_native_environment_reflection_interval", "4");
+                values.put("gta4_native_max_queued_frames", "2");
                 break;
             default: throw new AssertionError(profile);
         }
