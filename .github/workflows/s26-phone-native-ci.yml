@@ -17,6 +17,7 @@ on:
       - os/android/app/src/main/java/com/libertyrecomp/PhoneScriptExport.java
       - os/android/app/src/main/java/com/libertyrecomp/LauncherActivity.java
       - os/android/app/build.gradle.kts
+      - tools/test_s26_phone_program.cpp
       - tools/fixtures/PhoneScriptExportTest.java
       - tools/run_android_java_tests.py
   workflow_dispatch:
@@ -66,6 +67,11 @@ jobs:
             glue/rexglue-sdk-main/tests/unit/system/gta4_quicksave_policy_test.cpp \
             -o /tmp/s26-quicksave-test
           /tmp/s26-quicksave-test
+      - name: Compile optional private Xbox program validator
+        run: |
+          g++ -std=c++20 -O2 -Wall -Wextra -Werror \
+            -Iglue/rexglue-sdk-main/gta4-recomp/src -Iglue/rexglue-sdk-main/thirdparty \
+            tools/test_s26_phone_program.cpp -o /tmp/s26-real-phone
       - name: Verify native and Android cheat IDs remain identical
         run: |
           python3 - <<'PY'
@@ -122,7 +128,7 @@ jobs:
           assert int(re.search(r'versionCode\s*=\s*(\d+)',text).group(1))==104
           assert 'phone-diagnostics' in text
           PY
-          if gh release view s26-phone-diagnostics-v104 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+          if gh release view s26-phone-diagnostics-v104-r2 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             echo '::error::Diagnostic release already exists; do not replace its installer.'
             exit 1
           fi
@@ -190,7 +196,7 @@ jobs:
           printf '%s' "$KEYSTORE_B64" | base64 -d > "$KS"
           printf '%s' "$KEYSTORE_PASSWORD" > "$PASS"
           chmod 600 "$KS" "$PASS"
-          APK=out/XHYN-IV-S26-diagnostico-v104.apk
+          APK=out/XHYN-IV-S26-telefono-r2-v104.apk
           java -jar "$ANDROID_HOME/build-tools/35.0.0/lib/apksigner.jar" sign \
             --ks "$KS" --ks-key-alias xhyn-s26-stable --ks-pass "file:$PASS" \
             --v4-signing-enabled false --out "$APK" out/S26-diagnostic-unsigned.apk
@@ -212,7 +218,7 @@ jobs:
               return re.search(r"package: name='([^']+)' versionCode='(\d+)'",Path(name).read_text()).groups()
           assert identity('out/v102-badging.txt')==('com.kasoncubillos.xhynivs26stable','102')
           assert identity('out/diagnostic-badging.txt')==('com.kasoncubillos.xhynivs26stable','104')
-          with zipfile.ZipFile('out/XHYN-IV-S26-diagnostico-v104.apk') as apk:
+          with zipfile.ZipFile('out/XHYN-IV-S26-telefono-r2-v104.apk') as apk:
               for source in Path('out/apk-release/lib/arm64-v8a').glob('*.so'):
                   assert hashlib.sha256(source.read_bytes()).digest()==hashlib.sha256(apk.read('lib/arm64-v8a/'+source.name)).digest(),source
           print('Verified v102 certificate, same application ID, version 104 > 102 and current built native libraries')
@@ -225,14 +231,14 @@ jobs:
         run: |
           set -euo pipefail
           cat > out/diagnostic-notes.md <<'EOF'
-          Actualización de diagnóstico para la instalación estable v102. Conserva el paquete com.kasoncubillos.xhynivs26stable y su firma permanente, comparada contra el APK v102. Motor ARM64 compilado desde las fuentes de este commit, sin reutilizar Alpha1.
+          Revisión R2 para instalar encima de v102 o de la primera APK de diagnóstico v104. Conserva com.kasoncubillos.xhynivs26stable y el mismo certificado permanente de v102. Motor ARM64 reconstruido desde el código corregido, sin reutilizar Alpha1.
 
-          Instala este APK encima de la app existente. Para exportar desde el teléfono: Archivos del juego → Ubicación de archivos del juego → Exportar diagnóstico del teléfono → guardar XHYN-S26-telefono.zip en Descargas. Adjunta ese ZIP en el chat. No requiere acceso manual a Android/data, computadora ni copiar el juego completo; no exporta partidas ni ajustes.
+          Corregido el destino Cheats de Xbox a estado 1032, comprobado contra el spcellphonemain.sco real proporcionado por el propietario. Las comprobaciones del programa real validan 25 entradas, listado sin solicitudes, aceptación única, cierre condicionado y conservación del código de navegación y Quicksave. Las pruebas de emisión no certifican los efectos dentro del juego.
 
-          Incluye una integración candidata de 25 trucos en el teléfono de Niko. Todavía falta validar el SCO Xbox real y el comportamiento en Galaxy S26. Es una versión 104 de diagnóstico; no se declara lista v105 ni verificada en un dispositivo real.
+          Para probar: entra en juego libre, saca el teléfono original de Niko y busca Trucos / Cheats. Comprueba las 25 opciones sin marcar números, vuelve atrás sin activar nada y después prueba una opción. Comunica el resultado en el chat. Sigue siendo v104 de pruebas; v105 no se declara lista hasta completar las pruebas en Galaxy S26.
           EOF
-          gh release create s26-phone-diagnostics-v104 \
-            out/XHYN-IV-S26-diagnostico-v104.apk out/S26-diagnostico-SHA256.txt \
+          gh release create s26-phone-diagnostics-v104-r2 \
+            out/XHYN-IV-S26-telefono-r2-v104.apk out/S26-diagnostico-SHA256.txt \
             --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
-            --title 'S26: diagnóstico del teléfono · actualización sobre v102' \
+            --title 'S26: teléfono de Niko corregido para Xbox · R2 v104' \
             --prerelease --notes-file out/diagnostic-notes.md

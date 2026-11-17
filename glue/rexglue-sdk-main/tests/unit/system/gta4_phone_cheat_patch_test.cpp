@@ -31,7 +31,8 @@ struct Fixture {
     code[0x2000] = 47; code[0x2001] = 4;
     code[0x2100] = 47; code[0x2101] = 6;
     code[0x5000] = 47; code[0x5001] = 1;
-    prefix.clear(); detail::Append(prefix, p, kMenuState, "CP_CHEATS");
+    // Independent retail Xbox value, confirmed in the admitted decoded SCO.
+    prefix.clear(); detail::Append(prefix, p, 1032, "CP_CHEATS");
     std::copy(prefix.begin(), prefix.end(), code.begin() + stock);
     prefix.clear(); Branch(prefix, kCall, 0x2000);
     prefix.insert(prefix.end(), 16, 0);
@@ -62,6 +63,7 @@ struct Fixture {
   }
 };
 void Verify() {
+  CHECK_P(kMenuState == 1032);
   Fixture retail(true); CHECK_P(retail.Patch().code[retail.reset + 5] == kJump);
   Fixture f;
   auto out = f.Patch();

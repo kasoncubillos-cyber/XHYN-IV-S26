@@ -21,10 +21,10 @@ antes de que el constructor copie el programa `spcellphonemain`. No abre Android
    que usa Quicksave. Solo se amplía el juego base, episodio 0, compatible con
    las 25 acciones del puente existente; TLAD/TBoGT conservan Quicksave.
 2. Se localiza la llamada stock que añade `CP_CHEATS`, la construcción del
-   estado **1035** y la aceptación que llama al mapeo stock de `ACTIVATE_CHEAT`.
+   estado **1032** y la aceptación que llama al mapeo stock de `ACTIVATE_CHEAT`.
    Los contratos comprueban helpers, argumentos y unicidad. No se usan offsets PC.
 3. Se suprime la entrada stock condicional y se añade siempre **Trucos / Cheats**
-   apuntando al estado original 1035. Se conserva el renderer y la navegación stock.
+   apuntando al estado original 1032. Se conserva el renderer y la navegación stock.
 4. Entre el reset y el renderer se sustituye el bucle de trucos desbloqueados por
    25 llamadas al helper de opciones original. Se usan acciones reservadas
    `0x7E00..0x7E18` y claves de texto `LR_C00..LR_C24`.
@@ -53,29 +53,67 @@ Es evidencia de diseño, **no** una prueba binaria del SCO Xbox con el hash admi
 - Adaptador: fixture de instrucciones enlazadas **sintético**, 25 entradas,
   conservación del renderer, IDs reservados, rechazo de contratos ausentes,
   duplicados y episodio incorrecto; espera al cierre, expiración y cambio de mundo.
-- Catch2 con ASan/UBSan: 156117 aserciones del teléfono en tres casos; sin errores.
+- Catch2 con ASan/UBSan: 156118 aserciones del teléfono en tres casos; sin errores.
 - Núcleo PPC/CRT: 192 aserciones en 45 casos, con ASan/UBSan; correctas.
 - Sintaxis host del archivo completo de hooks: correcta.
 - Registro de hacks: 110 registros válidos.
-- Inspección adicional del SCO PC de FusionFix incluido en el repositorio:
-  decodificado localmente con RageLib/DataUtil como referencia, 52224 bytes de
-  código. El adaptador resuelve sus contratos estructurales con parámetros PC
-  temporales (helpers de 10 argumentos, menú local 1, opciones local 226).
-  La prueba detectó y corrigió el caso de renderers de estados vecinos y los
-  offsets locales cortos PUSH_S. No se añade ese perfil PC a producción ni se
-  relajan los hashes Xbox admitidos.
+- La inspección PC previa ayudó a resolver los helpers y operandos PUSH_S,
+  pero trasladó incorrectamente el destino Cheats 1035. El archivo Xbox real
+  demuestra que el destino correcto es **1032**; esta revisión corrige la
+  constante usada por el constructor y la validación de aceptación.
+- La fixture de CI fija 1032 como dato independiente del código del catálogo,
+  para detectar una futura regresión al identificador de PC.
 
-Estos tests no demuestran que los contratos coincidan con el SCO real instalado,
-que la pantalla se renderice correctamente ni que se produzcan los 25 efectos.
-No hay datos del juego ni dispositivo Galaxy S26 conectado en el entorno de trabajo.
-La PR sigue en borrador y **no es todavía una actualización lista para instalar**.
+## Validación del archivo Xbox real recibido del propietario
+
+El 17-11-2026 se recibió por Drive el `script.img` exportado desde la aplicación.
+Coincide byte por byte con el informe enviado por el propietario:
+
+| Dato | Valor |
+| --- | --- |
+| IMG | 15212544 bytes; SHA-256 `bbd59f160fa5ed2e29c5908e8fd9bd4e259804aaff61d2c43cd81e36d06b974a` |
+| Contenedor | IMG v3, 364 entradas, TOC de 11353 bytes |
+| Entrada | `spcellphonemain.sco`, índice 307, offset 14147584, 49384 bytes |
+| SCO original | SHA-256 `6b595de1d55375b2c71b026722d582fadd5d1732da268ec4a05d635b16b68dcf` |
+| Código decodificado | 45292 bytes, 1017 locales, SHA-256 `9ab320e5b78782cefc259fb885b391a6d6db5113e06a28cf307ca1feda09b12b` |
+| Estado Cheats | 1032, confirmado en el switch stock de Xbox |
+
+Los archivos comerciales se conservan solo como entrada privada de diagnóstico;
+no se incluyen en el repositorio, la APK ni los fixtures publicados.
+
+`tools/test_s26_phone_program.cpp` admite como entrada opcional ese código
+privado decodificado. Valida su SHA-256 con el perfil existente, simula la
+sustitución de operandos nativos realizada por el linker y comprueba los caminos
+generados con un intérprete pequeño de las instrucciones emitidas:
+
+- **91859 aserciones**, también con ASan/UBSan; sin errores.
+- Quicksave habilitado y deshabilitado: 25 opciones, labels y acciones exactas.
+- Ninguna solicitud al construir/listar; una solicitud al aceptar; cierre solo
+  si la cola admite la solicitud; pila equilibrada al regresar al código stock.
+- Código original intacto fuera de las cinco ventanas de salto previstas.
+- Código parcheado: 46183 bytes con Quicksave y 46152 sin Quicksave.
+
+Reproducción, con los datos privados disponibles localmente:
+
+```sh
+g++ -std=c++20 -O2 -Wall -Wextra -Werror \
+  -Iglue/rexglue-sdk-main/gta4-recomp/src \
+  -Iglue/rexglue-sdk-main/thirdparty \
+  tools/test_s26_phone_program.cpp -o /tmp/s26-real-phone
+/tmp/s26-real-phone /ruta/privada/spcellphonemain.code.bin
+```
+
+Esta prueba verifica los contratos binarios y la emisión del parche sobre el
+SCO Xbox real; no ejecuta el juego ni demuestra los 25 efectos en un S26.
+La PR sigue en borrador hasta completar esa validación física.
 
 ## Compilación ARM64
 
 El workflow `s26-phone-native-ci.yml` valida catálogo, adaptador y regresión de
 Quicksave en cada cambio relevante. Su ejecución manual con `build_native=true`
 prepara dependencias, compila el motor y el proxy desde el código fuente y muestra
-la arquitectura y hashes de las bibliotecas. No crea, firma ni sube APK.
+la arquitectura y hashes de las bibliotecas. La firma y publicación se habilitan
+solo con la opción manual adicional `diagnostic_apk=true`, autorizada por el propietario.
 
 El primer intento local de `build_native.sh 2` se detuvo antes de configurar:
 `no NDK at /home/agent/Android/Sdk/ndk/29.0.14206865`.
@@ -92,13 +130,14 @@ reutiliza bibliotecas Alpha1, que no contienen la integración C++.
 
 ## Validación pendiente antes de 105
 
-- Verificar contratos contra el SCO real admitido y el log de publicación del programa.
+- Completado: contratos del SCO Xbox real y caminos emitidos. Pendiente: log de
+  publicación del programa dentro del juego y resultados físicos en S26.
 - Nuevo juego y partida existente: menú visible sin marcar, 25 acciones, scroll completo,
   Back sin activación y una sola acción exacta por aceptación.
 - Probar Quicksave habilitado/deshabilitado, regreso al menú, llamadas e interrupciones.
 - Probar los efectos de las 25 acciones en juego libre y cancelaciones por carga/misión.
 - Comprobar estabilidad, FPS y protección térmica en Galaxy S26.
-- Con autorización posterior de firma: comparar certificado contra **v102**, verificar
+- Con la autorización de firma ya concedida: comparar certificado contra **v102**, verificar
   paquete y versión con herramientas Android, instalar encima sin desinstalar ni
   borrar datos y comprobar las mismas partidas. Nunca usar una firma de prueba.
 
@@ -126,3 +165,15 @@ workflow reconstruye todo ARM64, empaqueta esas bibliotecas, firma con los
 secretos permanentes y exige certificado idéntico al APK v102 antes de publicar
 una prerelease separada `s26-phone-diagnostics-v104`. No modifica la release v104
 existente ni declara completada la validación funcional de v105.
+
+
+## Revisión R2
+
+Corrige el estado Cheats a 1032 a partir del archivo Xbox real. Mantiene
+versionCode 104 y cambia versionName a `0.5.9.10-s26-phone-diagnostics-r2`.
+Se publica como `s26-phone-diagnostics-v104-r2` con el instalador
+`XHYN-IV-S26-telefono-r2-v104.apk`, sin reemplazar las releases anteriores.
+El workflow recompila todo ARM64 y compara el certificado con v102 antes de
+publicar. La R2 se puede instalar como actualización de v102 o del diagnóstico
+v104 anterior. Sigue pendiente probar la navegación, los 25 efectos y el
+rendimiento en el dispositivo antes de habilitar v105.

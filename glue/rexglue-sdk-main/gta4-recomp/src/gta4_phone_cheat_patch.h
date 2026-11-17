@@ -72,7 +72,7 @@ inline gta4::quicksave::PhonePatch BuildCheatsPatch(
   String(marker, "CP_CHEATS_");
   const auto label = Unique(linked, marker, starts);
 
-  // Stock state 1035: reset controller (4 args), conditional unlocked-cheat
+  // Stock state 1032: reset controller (4 args), conditional unlocked-cheat
   // loop, then finalize/render the controller (6 args). Keep both helpers.
   size_t reset = linked.size(), finish = linked.size();
   for (size_t at = label > 256 ? label - 256 : 0; at < label; ++at)
@@ -81,7 +81,7 @@ inline gta4::quicksave::PhonePatch BuildCheatsPatch(
     if (starts[at] && Helper(linked, at, 6)) {
       finish = at;
       // The next switch case can contain another renderer within 256 bytes.
-      // Only the first renderer after this loop belongs to state 1035.
+      // Only the first renderer after this loop belongs to state 1032.
       break;
     }
   if (reset == linked.size() || finish == linked.size() || reset + 10 >= label)

@@ -49,7 +49,8 @@ inline constexpr std::array<Entry, 25> kCatalog{{
     {109, "Cambiar a medianoche", Category::kMundo},
 }};
 
-inline constexpr uint32_t kMenuState = 1035, kActionBase = 0x7E00;
+// Retail Xbox SCO switch at 0x1EBF maps Cheats to state 1032.
+inline constexpr uint32_t kMenuState = 1032, kActionBase = 0x7E00;
 inline constexpr std::array<std::string_view, 25> kLabelKeys = {
     "LR_C00", "LR_C01", "LR_C02", "LR_C03", "LR_C04", "LR_C05", "LR_C06",
     "LR_C07", "LR_C08", "LR_C09", "LR_C10", "LR_C11", "LR_C12", "LR_C13",

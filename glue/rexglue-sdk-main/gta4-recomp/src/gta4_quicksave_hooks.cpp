@@ -434,7 +434,7 @@ void NativeObserve(PPCContext& ctx, uint8_t* base) {
     REXLOG_INFO("gta4-quicksave: phone menu built episode={} entries={} label=Quicksave action={}",
                 profile->name, count, kQuicksaveAction);
 }
-// Called only by the patched stock state-1035 accept branch. Menu construction,
+// Called only by the patched stock state-1032 accept branch. Menu construction,
 // scrolling and Back never reach this thunk or the guarded cheat queue.
 void NativeCheatRequest(PPCContext& ctx, uint8_t* base) {
   const auto* profile = CallerProfile(ctx, base);
@@ -759,7 +759,7 @@ extern "C" void sub_82846780(PPCContext& ctx, uint8_t* base) {
         patch = gta4::phone_cheats::BuildCheatsPatch(
             {rex::memory::GuestPtr(base, ctx.r5.u32), ctx.r6.u32}, *profile,
             patch, cheat_request_thunk, NativeAddress("ACTIVATE_CHEAT"));
-        REXLOG_INFO("gta4-phone-cheats: prepared 25 entries in stock state 1035; awaiting program publication");
+        REXLOG_INFO("gta4-phone-cheats: prepared 25 entries in stock state 1032; awaiting program publication");
       } catch (const std::exception& error) {
         REXLOG_ERROR("gta4-phone-cheats: contract rejected; stock Cheats retained: {}", error.what());
       }
