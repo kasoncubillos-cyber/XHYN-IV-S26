@@ -115,6 +115,7 @@ final class MobileSettingsUi {
         new Choice("android_perf_hint","Android performance hints","true",true,"true","false"),
         new Choice("android_thermal_guard","Thermal Guard","false",false,"true","false"),
         new Choice("android_gpu_turbo","GPU Turbo","false",true,"true","false"),
+        new Choice("audio_maxqframes","Búfer de audio","32",true,"32","40","48"),
         new Choice("audio_adaptive_buffer","Audio dropout protection","true",false,"true","false"),
         new Choice("audio_mute","Mute audio","false",false,"false","true"),
         new Choice("audio_low_latency","Low-latency audio","false",true,"false","true")
@@ -202,14 +203,14 @@ final class MobileSettingsUi {
                 // but remove their redundant one-tap tiles from this launcher.
                 ModernUi.gridAction(a,rows,"S26 60 FPS ciudad visible",()->ModernUi.builder(a)
                     .setTitle("60 FPS · Ciudad más visible")
-                    .setMessage("Versión experimental del perfil 60 FPS sostenidos para reducir la aparición tardía de edificios al conducir rápido. Mantiene 1080p de salida, FSR 1 Ultra Quality, SMAA Alto, protección térmica y límite de 60 FPS. Aumenta solo la distancia de dibujado de 0,90× a 1,05×; exige algo más de CPU/GPU y podría causar nuevas caídas si el teléfono se calienta. Mantiene la distancia adaptable, que puede reducir el detalle lejano bajo carga. Guarda y reinicia, y compara con el perfil anterior.")
+                    .setMessage("Versión experimental del perfil 60 FPS sostenidos para reducir la aparición tardía de edificios al conducir rápido. Mantiene 1080p de salida, FSR 1 Ultra Quality, SMAA Alto, protección térmica y límite de 60 FPS. Aumenta solo la distancia de dibujado de 0,90× a 1,05×; exige algo más de CPU/GPU y podría causar nuevas caídas si el teléfono se calienta. Mantiene la distancia adaptable y hereda los ajustes de sonido del modo sostenido: búfer adaptativo y cola de audio con un poco más de margen para tirones breves. Guarda y reinicia; la temperatura puede seguir limitando los FPS.")
                     .setNegativeButton("Cancelar",null)
-                    .setPositiveButton("Probar ciudad visible",(d,w)->{S26GraphicsProfiles.apply(draft,S26GraphicsProfiles.SUSTAINED_60_CITY);updatePending.run();render[0].run();}).show());
+                    .setPositiveButton("Probar ciudad visible",(d,w)->{S26GraphicsProfiles.apply(draft,S26GraphicsProfiles.SUSTAINED_60_CITY);if(sustainedSupported(a))draft.put("ui_sustained","true");updatePending.run();render[0].run();}).show());
                 ModernUi.gridAction(a,rows,"S26 60 FPS sostenidos",()->ModernUi.builder(a)
                     .setTitle("Objetivo: 60 FPS")
-                    .setMessage("Prioriza 60 FPS durante sesiones largas, persecuciones y conducción rápida. Conserva salida a 1080p, pero usa FSR 1 Ultra Quality (menos píxeles internos y una pequeña pérdida de nitidez frente a nativo), SMAA Alto y sombras de 512. Reduce la frecuencia de reflejos y el escenario lejano para limitar el calentamiento. Mantiene el límite de 60 FPS, pero no garantiza alcanzarlos si la CPU/GPU se ralentiza por temperatura. No desactiva las protecciones del teléfono. Guarda los cambios y reinicia.")
+                    .setMessage("Prioriza 60 FPS durante sesiones largas, persecuciones y conducción rápida. Conserva salida a 1080p, pero usa FSR 1 Ultra Quality (menos píxeles internos y una pequeña pérdida de nitidez frente a nativo), SMAA Alto y sombras de 512. Reduce la frecuencia de reflejos y el escenario lejano para limitar el calentamiento. Ahora incorpora el búfer adaptativo de audio, desactiva la baja latencia y amplía la cola de audio para reducir cortes breves durante tirones; podría retrasar ligeramente el sonido (hasta unos 43 ms adicionales). Mantiene protección térmica y GPU Turbo desactivado. No garantiza 60 FPS si el equipo se calienta. Guarda los cambios y reinicia.")
                     .setNegativeButton("Cancelar",null)
-                    .setPositiveButton("Seleccionar 60 FPS",(d,w)->{S26GraphicsProfiles.apply(draft,S26GraphicsProfiles.SUSTAINED_60);updatePending.run();render[0].run();}).show());
+                    .setPositiveButton("Seleccionar 60 FPS",(d,w)->{S26GraphicsProfiles.apply(draft,S26GraphicsProfiles.SUSTAINED_60);if(sustainedSupported(a))draft.put("ui_sustained","true");updatePending.run();render[0].run();}).show());
                 ModernUi.gridAction(a,rows,"S26 Ultra conducción fluida",()->ModernUi.builder(a)
                     .setTitle("Ultra conducción fluida")
                     .setMessage("Pensado para recorrer Liberty City rápidamente y sesiones prolongadas. Mantiene 1080p nativos, SMAA Ultra y sombras de alta calidad; limita algo el escenario lejano (1,2× en vez de 1,4×) y actualiza los reflejos cada dos fotogramas para reducir carga. Activa caché y preparación de efectos, desactiva GPU Turbo, conserva la protección térmica y el límite de FPS seleccionado. No garantiza mantener 60 FPS si el teléfono se calienta.")
@@ -292,6 +293,7 @@ final class MobileSettingsUi {
             case "android_perf_hint":return "Lets Android schedule work against the selected frame target. Device support varies. This is a hint, not a guarantee of faster clocks.";
             case "android_thermal_guard":return "When sustained thermal pressure is detected, temporarily reduces draw distance and backs off GPU Turbo. Restores after the phone stays cool. Can trade detail for steadier sustained play.";
             case "android_gpu_turbo":return "Requests more GPU performance where the device permits it. Can increase heat and power use; Thermal Guard can back it off under pressure.";
+            case "audio_maxqframes":return "Maximum guest audio queue: 32 blocks ~171 ms, 40 ~213 ms, 48 ~256 ms. A larger queue can absorb short stalls when the game heats up, at the cost of audio latency. It cannot fix sustained throttling; restart required.";
             case "audio_adaptive_buffer":return "After audio runs out, rebuilds about 11 ms of audio before resuming. Can reduce repeated crackling during brief stalls with a small delay. It cannot recover audio the game never produced.";
             case "audio_mute":return "Mutes the game's audio output.";
             case "audio_low_latency":return "Uses shorter audio buffering after restart. May increase crackling when the game misses audio deadlines. Leave off when troubleshooting dropouts.";
