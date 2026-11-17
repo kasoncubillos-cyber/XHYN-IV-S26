@@ -58,6 +58,11 @@ public class S26GraphicsProfilesTest {
         assertEquals("true",settings.get("gta4_native_converted_texture_disk_cache"));
         assertEquals("false",settings.get("android_gpu_turbo"));
         assertEquals("true",settings.get("android_thermal_guard"));
+        assertEquals("40",settings.get("audio_maxqframes"));
+        assertEquals("true",settings.get("audio_adaptive_buffer"));
+        assertEquals("false",settings.get("audio_low_latency"));
+        assertEquals("true",settings.get("ui_battery_refresh"));
+        assertFalse(settings.containsKey("ui_sustained"));
         assertEquals("keep_me",settings.get("unrelated_setting"));
     }
 
@@ -77,34 +82,28 @@ public class S26GraphicsProfilesTest {
         assertEquals("true",city.get("android_thermal_guard"));
     }
 
-    @Test public void longSessionAudioKeepsCityVisibilityAndLimitsPeakLoad() {
-        Map<String,String> values=new LinkedHashMap<>();
-        values.put("other_key","keep_me");
-        S26GraphicsProfiles.apply(values,S26GraphicsProfiles.LONG_SESSION_AUDIO);
-        assertEquals("60",values.get("gta4_frame_limit"));
-        assertEquals("1080p",values.get("resolution"));
-        assertEquals("fsr1",values.get("gta4_native_upscaler"));
-        assertEquals("ultra_quality",values.get("gta4_fsr1_quality"));
-        assertEquals("high",values.get("gta4_native_smaa_quality"));
-        assertEquals("512",values.get("gta4_shadow_map_base_size"));
-        assertEquals("1.05",values.get("gta4_draw_distance_scale"));
-        assertEquals("true",values.get("gta4_dynamic_draw_distance"));
-        assertEquals("true",values.get("android_thermal_guard"));
-        assertEquals("false",values.get("android_gpu_turbo"));
-        assertEquals("40",values.get("audio_maxqframes"));
-        assertEquals("true",values.get("audio_adaptive_buffer"));
-        assertEquals("false",values.get("audio_low_latency"));
-        assertEquals("true",values.get("ui_battery_refresh"));
-        assertEquals("keep_me",values.get("other_key"));
-        // ui_sustained must be enabled by the UI only on supported devices.
-        assertFalse(values.containsKey("ui_sustained"));
+    @Test public void cityVisibleInheritsSustainedAudioProtection() {
+        Map<String,String> city=new LinkedHashMap<>();
+        S26GraphicsProfiles.apply(city,S26GraphicsProfiles.SUSTAINED_60_CITY);
+        assertEquals("1.05",city.get("gta4_draw_distance_scale"));
+        assertEquals("40",city.get("audio_maxqframes"));
+        assertEquals("true",city.get("audio_adaptive_buffer"));
+        assertEquals("false",city.get("audio_low_latency"));
+        assertEquals("true",city.get("ui_battery_refresh"));
+        assertEquals("false",city.get("android_gpu_turbo"));
     }
 
-    @Test public void longSessionDoesNotChangeOtherSupportedGraphicsSettings() {
-        Map<String,String> city=new LinkedHashMap<>(),longSession=new LinkedHashMap<>();
-        S26GraphicsProfiles.apply(city,S26GraphicsProfiles.SUSTAINED_60_CITY);
-        S26GraphicsProfiles.apply(longSession,S26GraphicsProfiles.LONG_SESSION_AUDIO);
-        for (String key:city.keySet()) assertEquals(key,city.get(key),longSession.get(key));
+    @Test public void otherProfilesDoNotReceiveSustainedAudioChanges() {
+        for (String profile:new String[]{
+                S26GraphicsProfiles.BALANCED,
+                S26GraphicsProfiles.HIGH,
+                S26GraphicsProfiles.ULTRA_DRIVING,
+                S26GraphicsProfiles.POLICE_LIGHTS_TRAFFIC}) {
+            Map<String,String> values=new LinkedHashMap<>();
+            S26GraphicsProfiles.apply(values,profile);
+            assertFalse(profile,values.containsKey("audio_maxqframes"));
+            assertFalse(profile,values.containsKey("ui_battery_refresh"));
+        }
     }
 
     @Test public void sustained60RemainsOptInAndOldUltraStaysNative() {
