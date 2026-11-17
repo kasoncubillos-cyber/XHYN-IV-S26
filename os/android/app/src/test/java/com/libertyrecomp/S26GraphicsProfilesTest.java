@@ -58,10 +58,10 @@ public class S26GraphicsProfilesTest {
         assertEquals("true",settings.get("gta4_native_converted_texture_disk_cache"));
         assertEquals("false",settings.get("android_gpu_turbo"));
         assertEquals("true",settings.get("android_thermal_guard"));
-        assertEquals("40",settings.get("audio_maxqframes"));
+        assertEquals("32",settings.get("audio_maxqframes"));
         assertEquals("true",settings.get("audio_adaptive_buffer"));
         assertEquals("false",settings.get("audio_low_latency"));
-        assertEquals("true",settings.get("ui_battery_refresh"));
+        assertFalse(settings.containsKey("ui_battery_refresh"));
         assertFalse(settings.containsKey("ui_sustained"));
         assertEquals("keep_me",settings.get("unrelated_setting"));
     }
@@ -86,10 +86,10 @@ public class S26GraphicsProfilesTest {
         Map<String,String> city=new LinkedHashMap<>();
         S26GraphicsProfiles.apply(city,S26GraphicsProfiles.SUSTAINED_60_CITY);
         assertEquals("1.05",city.get("gta4_draw_distance_scale"));
-        assertEquals("40",city.get("audio_maxqframes"));
+        assertEquals("32",city.get("audio_maxqframes"));
         assertEquals("true",city.get("audio_adaptive_buffer"));
         assertEquals("false",city.get("audio_low_latency"));
-        assertEquals("true",city.get("ui_battery_refresh"));
+        assertFalse(city.containsKey("ui_battery_refresh"));
         assertEquals("false",city.get("android_gpu_turbo"));
     }
 
@@ -104,6 +104,59 @@ public class S26GraphicsProfilesTest {
             assertFalse(profile,values.containsKey("audio_maxqframes"));
             assertFalse(profile,values.containsKey("ui_battery_refresh"));
         }
+    }
+
+    @Test public void radvImportGetsSharperAndMoreStableVisibilityOnSameSustainedMode() {
+        Map<String,String> tuned=new LinkedHashMap<>();
+        tuned.put("custom_setting","keep");
+        S26GraphicsProfiles.applyForDriver(tuned,S26GraphicsProfiles.SUSTAINED_60,
+                "custom:RADV_Xclipse_27.0.0_devel_cc87fdf");
+        assertEquals("60",tuned.get("gta4_frame_limit"));
+        assertEquals("1080p",tuned.get("resolution"));
+        assertEquals("fsr1",tuned.get("gta4_native_upscaler"));
+        assertEquals("ultra_quality",tuned.get("gta4_fsr1_quality"));
+        assertEquals("0.05",tuned.get("gta4_fsr1_sharpness_reduction"));
+        assertEquals("1.05",tuned.get("gta4_draw_distance_scale"));
+        assertEquals("false",tuned.get("gta4_dynamic_draw_distance"));
+        assertEquals("256",tuned.get("gta4_shadow_map_base_size"));
+        assertEquals("medium",tuned.get("gta4_native_smaa_quality"));
+        assertEquals("32",tuned.get("audio_maxqframes"));
+        assertEquals("true",tuned.get("android_thermal_guard"));
+        assertEquals("false",tuned.get("android_gpu_turbo"));
+        assertEquals("keep",tuned.get("custom_setting"));
+        assertFalse(tuned.containsKey("ui_battery_refresh"));
+        assertFalse(tuned.containsKey("ui_sustained"));
+    }
+
+    @Test public void radvCityVisibleUsesSameTuningAsSustained() {
+        Map<String,String> tuned=new LinkedHashMap<>();
+        S26GraphicsProfiles.applyForDriver(tuned,S26GraphicsProfiles.SUSTAINED_60_CITY,
+                "custom:radv_xclipse_1.9");
+        assertEquals("1.05",tuned.get("gta4_draw_distance_scale"));
+        assertEquals("false",tuned.get("gta4_dynamic_draw_distance"));
+        assertEquals("0.05",tuned.get("gta4_fsr1_sharpness_reduction"));
+    }
+
+    @Test public void systemTurnipAndBundledRadv18StayAtExistingVisualDefaults() {
+        for(String mode:new String[]{"auto","system","turnip","radv18",
+                "custom:turnip_r6","custom:other_vulkan"}) {
+            Map<String,String> current=new LinkedHashMap<>(),tuned=new LinkedHashMap<>();
+            S26GraphicsProfiles.apply(current,S26GraphicsProfiles.SUSTAINED_60);
+            S26GraphicsProfiles.applyForDriver(tuned,S26GraphicsProfiles.SUSTAINED_60,mode);
+            assertEquals(mode,current,tuned);
+        }
+        assertFalse(S26GraphicsProfiles.usesExperimentalRadv("custom:turnip_19"));
+        assertTrue(S26GraphicsProfiles.usesExperimentalRadv("custom:radv-xclipse-v1.9"));
+    }
+
+    @Test public void radvDoesNotOverrideOtherProfilesOrTurnOnUnrequestedPowerModes() {
+        Map<String,String> baseline=new LinkedHashMap<>(),tuned=new LinkedHashMap<>();
+        S26GraphicsProfiles.apply(baseline,S26GraphicsProfiles.ULTRA_DRIVING);
+        S26GraphicsProfiles.applyForDriver(tuned,S26GraphicsProfiles.ULTRA_DRIVING,
+                "custom:RADV_Xclipse_1.9");
+        assertEquals(baseline,tuned);
+        assertFalse(tuned.containsKey("ui_sustained"));
+        assertFalse(tuned.containsKey("ui_battery_refresh"));
     }
 
     @Test public void sustained60RemainsOptInAndOldUltraStaysNative() {
