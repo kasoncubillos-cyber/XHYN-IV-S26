@@ -1,0 +1,185 @@
+name: S26 v107 - System driver sustained thermal signed (private artifact)
+
+on:
+  push:
+    branches:
+      - feature/s26-thermal-v107-signed-test
+    paths:
+      - .github/workflows/s26-v107-system-thermal-signed.yml
+      - os/android/app/build.gradle.kts
+      - os/android/app/src/main/java/com/libertyrecomp/**
+      - os/android/app/src/test/java/com/libertyrecomp/**
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: s26-v107-system-thermal-signed
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Verify and sign v107 system thermal test over native v106
+    runs-on: ubuntu-24.04
+    timeout-minutes: 100
+    steps:
+      - name: Checkout v107 source
+        uses: actions/checkout@v4
+        with:
+          submodules: false
+          persist-credentials: false
+
+      - name: Check package, version and sustained mode
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          text=Path('os/android/app/build.gradle.kts').read_text()
+          pkg=re.search(r'applicationId\s*=\s*"([^"]+)"',text).group(1)
+          code=int(re.search(r'versionCode\s*=\s*(\d+)',text).group(1))
+          assert (pkg,code)==('com.kasoncubillos.xhynivs26stable',107),(pkg,code)
+          profiles=Path('os/android/app/src/main/java/com/libertyrecomp/S26GraphicsProfiles.java').read_text()
+          ui=Path('os/android/app/src/main/java/com/libertyrecomp/MobileSettingsUi.java').read_text()
+          assert 'case SUSTAINED_60:' in profiles
+          assert 'audio_maxqframes", "32"' in profiles
+          assert 'audio_adaptive_buffer", "true"' in profiles
+          assert 'audio_low_latency", "false"' in profiles
+          assert 'case SUSTAINED_60_CITY:' in profiles
+          assert 'applyForDriver' in profiles
+          assert '"system".equalsIgnoreCase(driverMode)' in profiles
+          assert 'gta4_native_shadow_interval", "2"' in profiles
+          assert 'gta4_native_max_queued_frames", "2"' in profiles
+          assert 'gta4_dynamic_draw_distance", "false"' in profiles
+          assert 'S26 60 FPS sostenidos' in ui
+          assert 'S26 60 FPS sostenidos' in ui
+          assert 'S26 sesión larga · audio estable' not in ui
+          assert Path('os/android/app/src/main/java/com/libertyrecomp/CheatsUi.java').exists()
+          assert Path('os/android/app/src/main/java/com/libertyrecomp/PhoneScriptExport.java').exists()
+          print('Stable update identity, existing mode, existing MOD cheats and diagnostics preserved')
+          PY
+
+      - name: Java 17 for Android tests and release tools
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Android SDK and native-compatible pinned SDL3
+        uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+
+      - name: Install Android build tools and pinned SDL3 Java
+        run: |
+          set -euo pipefail
+          sdkmanager --licenses >/dev/null <<<'y' || true
+          sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+          git submodule update --init glue/rexglue-sdk-main/thirdparty/sdl3
+          echo "ANDROID_SDK_ROOT=$ANDROID_HOME" >> "$GITHUB_ENV"
+
+      - name: Download pinned v106 ARM64 with working MOD cheats and prior v102
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p out/baseline out/old
+          gh release download s26-radv19-claridad-v106 --repo "$GITHUB_REPOSITORY" \
+            --pattern XHYN-IV-S26-radv19-claridad-v106.apk --dir out/baseline
+          echo "8f61c5f81afadd448959f7cf1b9c0734bf16ef5d09e4f03916d5ff3de4df3fc9  out/baseline/XHYN-IV-S26-radv19-claridad-v106.apk" | sha256sum -c -
+          gh release download s26-update-v102 --repo "$GITHUB_REPOSITORY" \
+            --pattern XHYN-IV-S26-update-v102.apk --dir out/old
+          test -s out/old/XHYN-IV-S26-update-v102.apk
+
+      - name: Run Android unit and MOD menu regressions
+        working-directory: os/android
+        run: ./gradlew --no-daemon --max-workers=2 :app:testDebugUnitTest
+
+      - name: Build aligned Java v107 with exact verified v106 ARM64 libraries
+        run: |
+          set -euo pipefail
+          python3 os/android/scripts/package_release.py \
+            --native-apk out/baseline/XHYN-IV-S26-radv19-claridad-v106.apk \
+            --native-apk-sha256 8f61c5f81afadd448959f7cf1b9c0734bf16ef5d09e4f03916d5ff3de4df3fc9 \
+            --unsigned --output out/XHYN-IV-S26-v107-unsigned.apk
+
+      - name: Sign with unchanged private permanent certificate
+        env:
+          KEYSTORE_B64: ${{ secrets.XHYN_S26_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.XHYN_S26_KEYSTORE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [ -z "$KEYSTORE_B64" ] || [ -z "$KEYSTORE_PASSWORD" ]; then
+            echo "::error::Permanent signing secrets unavailable; release intentionally blocked."
+            exit 1
+          fi
+          KS="$RUNNER_TEMP/xhyn-s26-stable.p12"
+          PASS="$RUNNER_TEMP/xhyn-s26-stable-pass.txt"
+          trap 'rm -f "$KS" "$PASS"' EXIT
+          printf '%s' "$KEYSTORE_B64" | base64 -d > "$KS"
+          printf '%s' "$KEYSTORE_PASSWORD" > "$PASS"
+          chmod 600 "$KS" "$PASS"
+          java -jar "$ANDROID_HOME/build-tools/35.0.0/lib/apksigner.jar" sign \
+            --ks "$KS" --ks-key-alias xhyn-s26-stable \
+            --ks-pass "file:$PASS" --v4-signing-enabled false \
+            --out out/XHYN-IV-S26-thermal-system-v107.apk \
+            out/XHYN-IV-S26-v107-unsigned.apk
+          java -jar "$ANDROID_HOME/build-tools/35.0.0/lib/apksigner.jar" verify \
+            --verbose --print-certs out/XHYN-IV-S26-thermal-system-v107.apk > out/new-certificate.txt
+          java -jar "$ANDROID_HOME/build-tools/35.0.0/lib/apksigner.jar" verify \
+            --verbose --print-certs out/baseline/XHYN-IV-S26-radv19-claridad-v106.apk > out/v106-certificate.txt
+          java -jar "$ANDROID_HOME/build-tools/35.0.0/lib/apksigner.jar" verify \
+            --verbose --print-certs out/old/XHYN-IV-S26-update-v102.apk > out/v102-certificate.txt
+          "$ANDROID_HOME/build-tools/35.0.0/aapt2" dump badging out/XHYN-IV-S26-thermal-system-v107.apk > out/new-badging.txt
+          "$ANDROID_HOME/build-tools/35.0.0/aapt2" dump badging out/baseline/XHYN-IV-S26-radv19-claridad-v106.apk > out/v106-badging.txt
+          "$ANDROID_HOME/build-tools/35.0.0/aapt2" dump badging out/old/XHYN-IV-S26-update-v102.apk > out/v102-badging.txt
+          "$ANDROID_HOME/build-tools/35.0.0/zipalign" -c -P 16 4 out/XHYN-IV-S26-thermal-system-v107.apk
+
+      - name: Verify certificate, update sequence and byte-identical game libraries
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib
+          from pathlib import Path
+          import re
+          import zipfile
+          def cert(path):
+              hits=re.findall(r'Signer #\d+ certificate SHA-256 digest: ([0-9a-fA-F]+)',Path(path).read_text())
+              assert len(hits)==1,hits
+              return hits[0].lower()
+          known='fff28171a1b0de6014e7339b6872c672fb14b0cd408e5b15c6732bf70bf599d7'
+          assert {cert('out/v102-certificate.txt'),cert('out/v106-certificate.txt'),cert('out/new-certificate.txt')}=={known}
+          def identity(path):
+              hits=re.search(r"package: name='([^']+)' versionCode='(\d+)'",Path(path).read_text())
+              assert hits,path
+              return hits.group(1),int(hits.group(2))
+          pkg='com.kasoncubillos.xhynivs26stable'
+          assert identity('out/v102-badging.txt')==(pkg,102)
+          assert identity('out/v106-badging.txt')==(pkg,106)
+          assert identity('out/new-badging.txt')==(pkg,107)
+          baseline='out/baseline/XHYN-IV-S26-radv19-claridad-v106.apk'
+          signed='out/XHYN-IV-S26-thermal-system-v107.apk'
+          with zipfile.ZipFile(baseline) as old,zipfile.ZipFile(signed) as new:
+              original={n for n in old.namelist() if n.startswith('lib/arm64-v8a/') and n.endswith('.so')}
+              update={n for n in new.namelist() if n.startswith('lib/arm64-v8a/') and n.endswith('.so')}
+              assert len(original)>=10 and original==update,(len(original),len(update))
+              for name in sorted(original):
+                  assert hashlib.sha256(old.read(name)).digest()==hashlib.sha256(new.read(name)).digest(),name
+              assert any('classes.dex' in name for name in new.namelist())
+              code=b''.join(new.read(n) for n in new.namelist() if n.endswith('.dex'))
+              assert b'CheatsUi' in code and b'nativeQueueCheat' in code
+          print('Update v107 signed with same cert as v102/v106; native motor, MOD cheats and user data path preserved')
+          PY
+          sha256sum out/XHYN-IV-S26-thermal-system-v107.apk > out/XHYN-IV-S26-v107-SHA256.txt
+
+      - name: Save signed v107 ONLY as private workflow artifact (no Release)
+        uses: actions/upload-artifact@v4
+        with:
+          name: XHYN-S26-v107-thermal-system-SIGNED
+          path: |
+            out/XHYN-IV-S26-thermal-system-v107.apk
+            out/XHYN-IV-S26-v107-SHA256.txt
+          retention-days: 14
+          if-no-files-found: error
+          compression-level: 0
