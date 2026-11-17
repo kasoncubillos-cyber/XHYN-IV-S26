@@ -17,6 +17,8 @@ final class RadvXclipseDccPolicy {
 
     static boolean isImportedRadv(String selectedMode, String libraryName) {
         return selectedMode != null && selectedMode.startsWith("custom:")
+                && selectedMode.toLowerCase(java.util.Locale.ROOT).contains("radv")
+                && selectedMode.toLowerCase(java.util.Locale.ROOT).contains("xclipse")
                 && "vulkan.radeon.so".equals(libraryName);
     }
 
