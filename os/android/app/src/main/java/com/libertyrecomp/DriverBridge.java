@@ -108,6 +108,24 @@ final class DriverBridge {
         if (!driverDir.isDirectory() && !driverDir.mkdirs()) {
             Log.w(TAG, "cannot create " + driverDir);
         }
+        // Xclipse RADV-only test: apply explicit per-driver DCC settings before
+        // libvulkan and its driver are loaded. Never set Android global props.
+        // This is opt-in and the default does not change any environment.
+        if (custom && RadvXclipseDccPolicy.isImportedRadv(mode, library)) {
+            try {
+                File data=context.getExternalFilesDir(null);
+                if(data==null)data=context.getFilesDir();
+                String choice=DriverState.options(data,mode)
+                    .getOrDefault(RadvXclipseDccPolicy.OPTION,RadvXclipseDccPolicy.DEFAULT);
+                for (java.util.Map.Entry<String,String> variable:
+                        RadvXclipseDccPolicy.environment(mode,library,choice).entrySet()) {
+                    android.system.Os.setenv(variable.getKey(),variable.getValue(),true);
+                    Log.i(TAG, "Experimental RADV render-target compatibility: "+variable.getKey());
+                }
+            } catch (Exception error) {
+                Log.w(TAG, "RADV compatibility override unavailable; continuing with default driver settings",error);
+            }
+        }
         System.load(new File(nativeDir, "libvulkan.so").getAbsolutePath());
         // A custom driver that cannot run this GPU falls back to the system
         // driver; an explicit "system" choice has nothing to fall back to.
