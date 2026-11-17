@@ -367,15 +367,46 @@ public class LauncherActivity extends Activity {
     private String mSelectedSlot;
     private static final int REQUEST_SLOT_EXPORT=33,REQUEST_SLOT_IMPORT=34;
     private static final int REQUEST_GAME_TREE=35;
+    private static final int REQUEST_PHONE_SCRIPT_EXPORT=36;
     private void showGameLocation(){
         if(mBusy||gameRunning()){toast("Quit the game and finish the current task first.");return;}
         LinearLayout panel=new LinearLayout(this);panel.setOrientation(LinearLayout.VERTICAL);panel.addView(ModernUi.text(this,"Current location and extraction destination:\n"+Installer.installRoot(mDataRoot)+"\n\nNew installs extract here. Choose a location before installing, or copy the current installation here. Save slots and achievements stay in their existing folder.\n\nPicked folders are copied locally for native streaming; they are not used as a live SAF mount. Folder permission is needed only while copying. Keep this screen open until the copy finishes.",13,ModernUi.MUTED));
+        ModernUi.action(this,panel,"Exportar diagnóstico del teléfono",this::pickPhoneScriptExport);
         ModernUi.action(this,panel,"Use accessible Android/media folder",()->{try{File target=GameStorage.accessible(this);ModernUi.builder(this).setTitle("Use accessible game folder?").setMessage(target+"\n\nExisting game files are copied and verified first. This needs enough free storage for a second copy. The original remains available.").setPositiveButton("Copy and select",(d,w)->storageOperation(()->GameStorage.switchTo(mDataRoot,target))).setNegativeButton("Cancel",null).show();}catch(IOException e){toast(e.getMessage());}});
         ModernUi.action(this,panel,"Use app data folder",()->storageOperation(()->GameStorage.switchTo(mDataRoot,new File(mDataRoot,"LibertyRecomp"))));
         ModernUi.action(this,panel,"Copy an existing game folder here",()->{Intent pick=new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);pick.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);ModernUi.builder(this).setTitle("Import a local game copy?").setMessage("Choose the folder containing default.xex, or its parent containing game and optionally dlc. A validated copy replaces those folders here. Any replaced files are kept in folder-import-recovery; other app data stays in place.").setNegativeButton("Cancel",null).setPositiveButton("Choose folder",(d,w)->{try{startActivityForResult(pick,REQUEST_GAME_TREE);}catch(Exception e){toast("No folder picker available.");}}).show();});
         ModernUi.dialog(this,"Game file location",panel).show();
     }
     private void storageOperation(SlotTask task){if(mBusy||gameRunning())return;setBusy(true,"Preparing game folder…");new Thread(()->{String result;try{task.run();String catalog=Installer.prepareAchievements(this,mDataRoot);result="Game folder ready. Original files were kept."+(catalog==null||catalog.isEmpty()?"":" Achievement catalog: "+catalog);}catch(IOException|RuntimeException e){result="Game folder operation did not finish: "+e.getMessage();}String value=result;mMain.post(()->{setBusy(false,null);toast(value);refreshInstall();refreshStatus();});},"GameStorage").start();}
+    private void pickPhoneScriptExport() {
+        if(mBusy||gameRunning()){toast("Sal del juego antes de exportar el diagnostico.");return;}
+        Intent intent=new Intent(Intent.ACTION_CREATE_DOCUMENT);
+        intent.addCategory(Intent.CATEGORY_OPENABLE);intent.setType("application/zip");
+        intent.putExtra(Intent.EXTRA_TITLE,"XHYN-S26-telefono.zip");
+        try{startActivityForResult(intent,REQUEST_PHONE_SCRIPT_EXPORT);}
+        catch(RuntimeException error){toast("No se pudo abrir el selector de archivos.");}
+    }
+    private void exportPhoneScript(Uri uri) {
+        if(mBusy||gameRunning()){toast("Sal del juego antes de exportar el diagnostico.");return;}
+        setBusy(true,"Exportando diagnostico del telefono...");
+        final File game=new File(Installer.installRoot(mDataRoot),"game");
+        new Thread(()->{
+            String result;
+            try(OutputStream output=getContentResolver().openOutputStream(uri,"w")) {
+                if(output==null)throw new IOException("No se pudo abrir el destino.");
+                int count=PhoneScriptExport.write(game,output);
+                result=count>0?"Diagnóstico guardado. Adjunta XHYN-S26-telefono.zip en el chat.":
+                    "Informe guardado sin scripts sueltos. Adjunta el ZIP en el chat para revisar la ubicacion.";
+            }catch(IOException|RuntimeException error){
+                try{android.provider.DocumentsContract.deleteDocument(getContentResolver(),uri);}
+                catch(Exception cleanup){Log.w(TAG,"Could not remove incomplete phone export",cleanup);}
+                result="No se pudo exportar el diagnostico: "+error.getMessage();
+            }
+            final String message=result;mMain.post(()->{setBusy(false,null);
+                ModernUi.builder(this).setTitle("Diagnóstico del teléfono").setMessage(message)
+                    .setPositiveButton("Aceptar",null).show();});
+        },"ExportPhoneScript").start();
+    }
     private void showSaveData() {
         if(mBusy)return;if(gameRunning()){toast("Quit the game before managing saves.");return;}
         ModernUi.builder(this).setTitle("Save data").setItems(new String[]{"Manage individual slots","Export all saves & achievements","Import full backup"},(dialog,which)->{if(which==0)showSaveSlots();else if(which==1)pickSaveDocument(true);else ModernUi.builder(this).setTitle("Restore full backup?").setMessage("Validate and replace included save data, keeping a recovery copy. Older save-only backups preserve achievements.").setPositiveButton("Choose ZIP",(d,w)->pickSaveDocument(false)).setNegativeButton("Cancel",null).show();}).show();
@@ -990,6 +1021,10 @@ public class LauncherActivity extends Activity {
     @SuppressWarnings("deprecation")
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
+        if(requestCode==REQUEST_PHONE_SCRIPT_EXPORT){
+            if(resultCode==RESULT_OK&&data!=null&&data.getData()!=null)exportPhoneScript(data.getData());
+            return;
+        }
         if(requestCode==REQUEST_GAME_TREE){if(resultCode==RESULT_OK&&data!=null&&data.getData()!=null){final Uri uri=data.getData();storageOperation(()->GameStorage.importTree(this,mDataRoot,uri));}return;}
         if(requestCode==REQUEST_SLOT_EXPORT||requestCode==REQUEST_SLOT_IMPORT){if(resultCode!=RESULT_OK||data==null||data.getData()==null)return;if(mSelectedSlot==null){toast("Select the save slot again.");return;}final String selected=mSelectedSlot;final Uri uri=data.getData();slotOperation(()->{File root=SaveData.root(mDataRoot);if(requestCode==REQUEST_SLOT_EXPORT){try(OutputStream out=getContentResolver().openOutputStream(uri)){if(out==null)throw new IOException("Cannot open destination.");SaveData.exportSlot(root,selected,out);}}else{try(InputStream in=getContentResolver().openInputStream(uri)){if(in==null)throw new IOException("Cannot open backup.");SaveData.importSlot(root,selected,in);}}},requestCode==REQUEST_SLOT_EXPORT?"Selected slot backed up.":"Selected slot restored.");return;}
         if(requestCode==REQUEST_SAVE_EXPORT||requestCode==REQUEST_SAVE_IMPORT) {

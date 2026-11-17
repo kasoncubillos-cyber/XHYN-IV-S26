@@ -14,10 +14,20 @@ on:
       - glue/rexglue-sdk-main/gta4-recomp/src/gta4_phone_quicksave_profiles.h
       - glue/rexglue-sdk-main/gta4-recomp/src/gta4_quicksave_hooks.cpp
       - docs/android/S26-TELEFONO-TRUCOS-V105.md
+      - os/android/app/src/main/java/com/libertyrecomp/PhoneScriptExport.java
+      - os/android/app/src/main/java/com/libertyrecomp/LauncherActivity.java
+      - os/android/app/build.gradle.kts
+      - tools/fixtures/PhoneScriptExportTest.java
+      - tools/run_android_java_tests.py
   workflow_dispatch:
     inputs:
       build_native:
         description: 'Compile full ARM64 engine only (no APK, signing or distribution)'
+        type: boolean
+        default: false
+        required: true
+      diagnostic_apk:
+        description: 'Authorized signed diagnostic v104 update, with v102 certificate comparison'
         type: boolean
         default: false
         required: true
@@ -83,7 +93,9 @@ jobs:
           PY
 
   native:
-    name: Native ARM64 compile only (manual; no APK)
+    name: Fresh ARM64 engine (optional authorized diagnostic APK)
+    permissions:
+      contents: write
     if: github.event_name == 'workflow_dispatch' && inputs.build_native == true
     needs: catalog
     runs-on: ubuntu-24.04
@@ -93,6 +105,27 @@ jobs:
         with:
           submodules: false
           persist-credentials: false
+      - name: Verify diagnostic release preconditions
+        if: inputs.diagnostic_apk == true
+        env:
+          KEYSTORE_B64: ${{ secrets.XHYN_S26_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.XHYN_S26_KEYSTORE_PASSWORD }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test -n "$KEYSTORE_B64" && test -n "$KEYSTORE_PASSWORD"
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          text=Path('os/android/app/build.gradle.kts').read_text()
+          assert re.search(r'applicationId\s*=\s*"com.kasoncubillos.xhynivs26stable"',text)
+          assert int(re.search(r'versionCode\s*=\s*(\d+)',text).group(1))==104
+          assert 'phone-diagnostics' in text
+          PY
+          if gh release view s26-phone-diagnostics-v104 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo '::error::Diagnostic release already exists; do not replace its installer.'
+            exit 1
+          fi
       - name: Recover build disk
         run: |
           sudo rm -rf /usr/share/dotnet /opt/hostedtoolcache/CodeQL /usr/local/share/powershell
@@ -121,6 +154,8 @@ jobs:
       - name: Android UI unit tests
         working-directory: os/android
         run: ./gradlew --no-daemon --max-workers=2 :app:testDebugUnitTest
+      - name: Check Java export and save preservation regressions
+        run: python3 tools/run_android_java_tests.py
       - name: Compile native game ARM64 (no Alpha1 reuse)
         env:
           BUILD_TYPE: Release
@@ -132,4 +167,72 @@ jobs:
           set -euo pipefail
           file os/android/app/src/main/jniLibs/arm64-v8a/libmain.so
           sha256sum os/android/app/src/main/jniLibs/arm64-v8a/*.so
-          echo "Fresh ARM64 libraries built from $GITHUB_SHA. No APK created, signed or distributed." >> "$GITHUB_STEP_SUMMARY"
+          echo "Fresh ARM64 libraries built from $GITHUB_SHA. APK signing requires diagnostic_apk=true." >> "$GITHUB_STEP_SUMMARY"
+      - name: Package freshly compiled diagnostic update
+        if: inputs.diagnostic_apk == true
+        run: |
+          set -euo pipefail
+          mkdir -p out
+          python3 os/android/scripts/package_release.py --unsigned --output out/S26-diagnostic-unsigned.apk
+      - name: Sign permanently and verify update identity against installed v102
+        if: inputs.diagnostic_apk == true
+        env:
+          KEYSTORE_B64: ${{ secrets.XHYN_S26_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.XHYN_S26_KEYSTORE_PASSWORD }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release download s26-update-v102 --repo "$GITHUB_REPOSITORY" \
+            --pattern XHYN-IV-S26-update-v102.apk --dir out/v102
+          KS="$RUNNER_TEMP/xhyn-s26-stable.p12"
+          PASS="$RUNNER_TEMP/xhyn-s26-stable-pass.txt"
+          trap 'rm -f "$KS" "$PASS"' EXIT
+          printf '%s' "$KEYSTORE_B64" | base64 -d > "$KS"
+          printf '%s' "$KEYSTORE_PASSWORD" > "$PASS"
+          chmod 600 "$KS" "$PASS"
+          APK=out/XHYN-IV-S26-diagnostico-v104.apk
+          java -jar "$ANDROID_HOME/build-tools/35.0.0/lib/apksigner.jar" sign \
+            --ks "$KS" --ks-key-alias xhyn-s26-stable --ks-pass "file:$PASS" \
+            --v4-signing-enabled false --out "$APK" out/S26-diagnostic-unsigned.apk
+          java -jar "$ANDROID_HOME/build-tools/35.0.0/lib/apksigner.jar" verify \
+            --verbose --print-certs "$APK" > out/diagnostic-certificate.txt
+          java -jar "$ANDROID_HOME/build-tools/35.0.0/lib/apksigner.jar" verify \
+            --verbose --print-certs out/v102/XHYN-IV-S26-update-v102.apk > out/v102-certificate.txt
+          "$ANDROID_HOME/build-tools/35.0.0/aapt2" dump badging "$APK" > out/diagnostic-badging.txt
+          "$ANDROID_HOME/build-tools/35.0.0/aapt2" dump badging out/v102/XHYN-IV-S26-update-v102.apk > out/v102-badging.txt
+          "$ANDROID_HOME/build-tools/35.0.0/zipalign" -c -P 16 4 "$APK"
+          python3 - <<'PY'
+          from pathlib import Path
+          import re,zipfile,hashlib
+          def cert(name):
+              return re.findall(r'Signer #\d+ certificate SHA-256 digest: ([0-9a-fA-F]+)',Path(name).read_text())
+          old,new=cert('out/v102-certificate.txt'),cert('out/diagnostic-certificate.txt')
+          assert len(old)==1 and old==new, 'Permanent signing certificate differs from v102'
+          def identity(name):
+              return re.search(r"package: name='([^']+)' versionCode='(\d+)'",Path(name).read_text()).groups()
+          assert identity('out/v102-badging.txt')==('com.kasoncubillos.xhynivs26stable','102')
+          assert identity('out/diagnostic-badging.txt')==('com.kasoncubillos.xhynivs26stable','104')
+          with zipfile.ZipFile('out/XHYN-IV-S26-diagnostico-v104.apk') as apk:
+              for source in Path('out/apk-release/lib/arm64-v8a').glob('*.so'):
+                  assert hashlib.sha256(source.read_bytes()).digest()==hashlib.sha256(apk.read('lib/arm64-v8a/'+source.name)).digest(),source
+          print('Verified v102 certificate, same application ID, version 104 > 102 and current built native libraries')
+          PY
+          sha256sum "$APK" > out/S26-diagnostico-SHA256.txt
+      - name: Publish authorized diagnostic installer
+        if: inputs.diagnostic_apk == true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          cat > out/diagnostic-notes.md <<'EOF'
+          Actualización de diagnóstico para la instalación estable v102. Conserva el paquete com.kasoncubillos.xhynivs26stable y su firma permanente, comparada contra el APK v102. Motor ARM64 compilado desde las fuentes de este commit, sin reutilizar Alpha1.
+
+          Instala este APK encima de la app existente. Para exportar desde el teléfono: Archivos del juego → Ubicación de archivos del juego → Exportar diagnóstico del teléfono → guardar XHYN-S26-telefono.zip en Descargas. Adjunta ese ZIP en el chat. No requiere acceso manual a Android/data, computadora ni copiar el juego completo; no exporta partidas ni ajustes.
+
+          Incluye una integración candidata de 25 trucos en el teléfono de Niko. Todavía falta validar el SCO Xbox real y el comportamiento en Galaxy S26. Es una versión 104 de diagnóstico; no se declara lista v105 ni verificada en un dispositivo real.
+          EOF
+          gh release create s26-phone-diagnostics-v104 \
+            out/XHYN-IV-S26-diagnostico-v104.apk out/S26-diagnostico-SHA256.txt \
+            --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+            --title 'S26: diagnóstico del teléfono · actualización sobre v102' \
+            --prerelease --notes-file out/diagnostic-notes.md

@@ -101,3 +101,28 @@ reutiliza bibliotecas Alpha1, que no contienen la integración C++.
 - Con autorización posterior de firma: comparar certificado contra **v102**, verificar
   paquete y versión con herramientas Android, instalar encima sin desinstalar ni
   borrar datos y comprobar las mismas partidas. Nunca usar una firma de prueba.
+
+
+## Diagnóstico desde Android sin acceso a carpetas protegidas
+
+El propietario autorizó posteriormente la firma y distribución. Como Android
+no permite abrir la carpeta del juego desde su administrador de archivos y no
+hay computadora disponible, se añade **Exportar diagnóstico del teléfono** a la
+pantalla de ubicación del juego. Usa `ACTION_CREATE_DOCUMENT` para guardar
+`XHYN-S26-telefono.zip` en Descargas, sin cambiar la ubicación del juego.
+
+El exportador solo lee `script.img`, `script.rpf` y `spcellphonemain.sco` dentro
+de la instalación seleccionada. Incluye rutas relativas y SHA-256; no busca
+partidas ni preferencias. No sigue enlaces simbólicos y limita archivos/tamaño.
+Si no encuentra scripts sueltos, produce únicamente un informe con nombres
+relacionados para investigar el formato de instalación sin pedir otra copia del
+juego. Las pruebas comparan bytes originales/exportados, conservación de partidas,
+exclusión de enlaces, reporte de ausencia y rechazo de archivos excesivos.
+
+La APK de diagnóstico mantiene versionCode **104** (superior a la v102 instalada),
+paquete estable y clave permanente. Se distingue por versionName
+`0.5.9.10-s26-phone-diagnostics`. La opción manual `diagnostic_apk=true` del
+workflow reconstruye todo ARM64, empaqueta esas bibliotecas, firma con los
+secretos permanentes y exige certificado idéntico al APK v102 antes de publicar
+una prerelease separada `s26-phone-diagnostics-v104`. No modifica la release v104
+existente ni declara completada la validación funcional de v105.
