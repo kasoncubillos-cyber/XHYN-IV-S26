@@ -15,10 +15,9 @@ final class S26GraphicsProfiles {
     static final String ULTRA_DRIVING = "ultra_driving";
     static final String SUSTAINED_60 = "sustained_60";
     static final String SUSTAINED_60_CITY = "sustained_60_city";
-    static final String LONG_SESSION_AUDIO = "long_session_audio";
 
     static void apply(Map<String,String> values, String profile) {
-        if (!BALANCED.equals(profile) && !HIGH.equals(profile) && !MAX_EXPERIMENTAL.equals(profile) && !ULTRA_VISUAL.equals(profile) && !POLICE_LIGHTS_TRAFFIC.equals(profile) && !ULTRA_DRIVING.equals(profile) && !SUSTAINED_60.equals(profile) && !SUSTAINED_60_CITY.equals(profile) && !LONG_SESSION_AUDIO.equals(profile))
+        if (!BALANCED.equals(profile) && !HIGH.equals(profile) && !MAX_EXPERIMENTAL.equals(profile) && !ULTRA_VISUAL.equals(profile) && !POLICE_LIGHTS_TRAFFIC.equals(profile) && !ULTRA_DRIVING.equals(profile) && !SUSTAINED_60.equals(profile) && !SUSTAINED_60_CITY.equals(profile))
             throw new IllegalArgumentException("Unknown S26 graphics profile: " + profile);
 
         // Never overwrite a frame cap the player has already tested successfully.
@@ -173,6 +172,14 @@ final class S26GraphicsProfiles {
                 values.put("gta4_native_max_queued_frames", "3");
                 values.put("android_gpu_turbo", "false");
                 values.put("android_thermal_guard", "true");
+                // Keep the original sustained visuals. Protect sound during
+                // short frame-time spikes and prefer the normal-latency path.
+                // A 40-block guest queue adds up to ~43 ms versus 32 blocks.
+                // It cannot restore CPU/GPU speed lost to thermal throttling.
+                values.put("audio_maxqframes", "40");
+                values.put("audio_adaptive_buffer", "true");
+                values.put("audio_low_latency", "false");
+                values.put("ui_battery_refresh", "true");
                 break;
             case SUSTAINED_60_CITY:
                 // Keep the proven cooler 60-FPS settings of v101, with a small
@@ -180,22 +187,6 @@ final class S26GraphicsProfiles {
                 // The adaptive draw distance may still reduce it under load.
                 apply(values, SUSTAINED_60);
                 values.put("gta4_draw_distance_scale", "1.05");
-                break;
-            case LONG_SESSION_AUDIO:
-                // One-tap diagnostic for heat-related FPS drops accompanied by
-                // audio crackling. Keep visible distant scenery at 1.05x and
-                // 1080p output; reduce internal GPU work via the proven FSR1
-                // profile. This is not a guarantee of 60 FPS after throttling.
-                apply(values, SUSTAINED_60_CITY);
-                // 40 * 256 / 48k ~= 213 ms max queued guest-audio headroom.
-                // Extra ~43 ms versus the Android default 32 can hide short
-                // producer stalls, but cannot repair sustained CPU starvation.
-                values.put("audio_maxqframes", "40");
-                values.put("audio_adaptive_buffer", "true");
-                values.put("audio_low_latency", "false");
-                values.put("ui_battery_refresh", "true");
-                values.put("android_gpu_turbo", "false");
-                values.put("android_thermal_guard", "true");
                 break;
             default: throw new AssertionError(profile);
         }
