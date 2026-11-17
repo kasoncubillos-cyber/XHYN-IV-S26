@@ -213,7 +213,8 @@ final class S26GraphicsProfiles {
             // Draw objects further out and do not shrink the scene merely
             // because frame delivery falls below 60 fps. Android thermal
             // protection stays on and may still reduce detail when required.
-            values.put("gta4_draw_distance_scale", "1.10");
+            values.put("gta4_draw_distance_scale",
+                    SUSTAINED_60_CITY.equals(profile) ? "1.15" : "1.10");
             values.put("gta4_dynamic_draw_distance", "false");
             // Reuse converted textures while memory is available; reclamation
             // remains controlled by the native renderer's memory pressure.
