@@ -137,8 +137,8 @@ public class S26GraphicsProfilesTest {
         assertEquals("0.05",tuned.get("gta4_fsr1_sharpness_reduction"));
     }
 
-    @Test public void systemTurnipAndBundledRadv18StayAtExistingVisualDefaults() {
-        for(String mode:new String[]{"auto","system","turnip","radv18",
+    @Test public void nonSystemNonRadvDriversStayAtExistingVisualDefaults() {
+        for(String mode:new String[]{"turnip","radv18",
                 "custom:turnip_r6","custom:other_vulkan"}) {
             Map<String,String> current=new LinkedHashMap<>(),tuned=new LinkedHashMap<>();
             S26GraphicsProfiles.apply(current,S26GraphicsProfiles.SUSTAINED_60);
@@ -147,6 +147,57 @@ public class S26GraphicsProfilesTest {
         }
         assertFalse(S26GraphicsProfiles.usesExperimentalRadv("custom:turnip_19"));
         assertTrue(S26GraphicsProfiles.usesExperimentalRadv("custom:radv-xclipse-v1.9"));
+    }
+
+    @Test public void systemOrAutoAppliesPr10ThermalTestOnlyWhenSelectingSustained() {
+        for (String mode:new String[]{"auto","system"}) {
+            Map<String,String> baseline=new LinkedHashMap<>(),tuned=new LinkedHashMap<>();
+            S26GraphicsProfiles.apply(baseline,S26GraphicsProfiles.SUSTAINED_60);
+            S26GraphicsProfiles.applyForDriver(tuned,S26GraphicsProfiles.SUSTAINED_60,mode);
+            assertEquals("60",tuned.get("gta4_frame_limit"));
+            assertEquals("1080p",tuned.get("resolution"));
+            assertEquals("fsr1",tuned.get("gta4_native_upscaler"));
+            assertEquals("0.9",tuned.get("gta4_draw_distance_scale"));
+            assertEquals("true",tuned.get("gta4_dynamic_draw_distance"));
+            assertEquals("2",tuned.get("gta4_native_shadow_interval"));
+            assertEquals("4",tuned.get("gta4_native_water_reflection_interval"));
+            assertEquals("4",tuned.get("gta4_native_environment_reflection_interval"));
+            assertEquals("2",tuned.get("gta4_native_max_queued_frames"));
+            assertEquals("32",tuned.get("audio_maxqframes"));
+            assertEquals("true",tuned.get("android_thermal_guard"));
+            assertEquals("false",tuned.get("android_gpu_turbo"));
+            assertFalse(tuned.containsKey("ui_sustained"));
+            assertFalse(tuned.containsKey("ui_battery_refresh"));
+            baseline.remove("gta4_native_shadow_interval");
+            baseline.remove("gta4_native_water_reflection_interval");
+            baseline.remove("gta4_native_environment_reflection_interval");
+            baseline.remove("gta4_native_max_queued_frames");
+            tuned.remove("gta4_native_shadow_interval");
+            tuned.remove("gta4_native_water_reflection_interval");
+            tuned.remove("gta4_native_environment_reflection_interval");
+            tuned.remove("gta4_native_max_queued_frames");
+            assertEquals(baseline,tuned);
+        }
+    }
+
+    @Test public void systemCityVisibleAppliesPr10DistanceWithoutChangingSoundOrFsr() {
+        Map<String,String> tuned=new LinkedHashMap<>();
+        S26GraphicsProfiles.applyForDriver(tuned,S26GraphicsProfiles.SUSTAINED_60_CITY,"system");
+        assertEquals("1.0",tuned.get("gta4_draw_distance_scale"));
+        assertEquals("60",tuned.get("gta4_frame_limit"));
+        assertEquals("ultra_quality",tuned.get("gta4_fsr1_quality"));
+        assertEquals("true",tuned.get("gta4_dynamic_draw_distance"));
+        assertEquals("2",tuned.get("gta4_native_max_queued_frames"));
+        assertEquals("32",tuned.get("audio_maxqframes"));
+    }
+
+    @Test public void highAndUltraRemainUnchangedForSystemDriver() {
+        for (String profile:new String[]{S26GraphicsProfiles.HIGH,S26GraphicsProfiles.ULTRA_DRIVING}) {
+            Map<String,String> old=new LinkedHashMap<>(),current=new LinkedHashMap<>();
+            S26GraphicsProfiles.apply(old,profile);
+            S26GraphicsProfiles.applyForDriver(current,profile,"system");
+            assertEquals(old,current);
+        }
     }
 
     @Test public void radvDoesNotOverrideOtherProfilesOrTurnOnUnrequestedPowerModes() {

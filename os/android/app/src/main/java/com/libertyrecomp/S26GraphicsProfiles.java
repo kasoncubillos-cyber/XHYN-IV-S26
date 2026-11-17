@@ -190,13 +190,26 @@ final class S26GraphicsProfiles {
     }
 
     /**
-     * Optional, deliberately user-selected RADV Xclipse trial. Never automatically
-     * change graphics or drivers on installation or on app start.
+     * Explicit user-selected sustained-mode tuning. Never change drivers or
+     * graphics at application start. Existing RADV trial remains opt-in.
      */
     static void applyForDriver(Map<String,String> values, String profile, String driverMode) {
         apply(values,profile);
-        if (!usesExperimentalRadv(driverMode) ||
-                (!SUSTAINED_60.equals(profile) && !SUSTAINED_60_CITY.equals(profile))) return;
+        if (!SUSTAINED_60.equals(profile) && !SUSTAINED_60_CITY.equals(profile)) return;
+
+        // System-driver thermal trial from PR #10, adapted to the v106 codebase
+        // so cheats, saves, sound and earlier driver fixes remain unchanged.
+        // Automatic resolves to System for the Exynos Xclipse GPU.
+        if ("system".equalsIgnoreCase(driverMode) || "auto".equalsIgnoreCase(driverMode)) {
+            values.put("gta4_native_shadow_interval", "2");
+            values.put("gta4_native_water_reflection_interval", "4");
+            values.put("gta4_native_environment_reflection_interval", "4");
+            values.put("gta4_native_max_queued_frames", "2");
+            if (SUSTAINED_60_CITY.equals(profile))
+                values.put("gta4_draw_distance_scale", "1.0");
+            return;
+        }
+        if (!usesExperimentalRadv(driverMode)) return;
 
         // RADV experiment: prioritize recognisable distant buildings/vehicles.
         // FSR1 still works below native output resolution, but less softening
