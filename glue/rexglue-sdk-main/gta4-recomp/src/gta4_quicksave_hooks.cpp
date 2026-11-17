@@ -4,6 +4,7 @@
 #include "gta4_quicksave_policy.h"
 #include "gta4_cheat_policy.h"
 #include "gta4_phone_quicksave_profiles.h"
+#include "gta4_phone_cheat_patch.h"
 
 #include <array>
 #include <atomic>
@@ -39,6 +40,7 @@ REXCVAR_DEFINE_INT32(gta4_completion_episode,-1,"GTA IV/Status","Episode of the 
 REXCVAR_DEFINE_STRING(gta4_cheat_status,"Ready","GTA IV/Status","Last requested cheat result");
 
 namespace gta4::quicksave {
+bool QueuePhoneCheat(uint32_t index);
 namespace {
 // All addresses below come from generated PPC and the existing script-aware input hooks.
 constexpr uint32_t kEpisode = 0x82B39504, kExecutingThread = 0x8319277C, kGlobals = 0x831927B4;
@@ -56,7 +58,7 @@ std::array<bool, 3> installed{};
 std::array<uint32_t, 3> program_addresses{};
 std::atomic<uint32_t> menu_trace_count{0};
 thread_local bool inside_poll = false;
-uint32_t request_thunk = 0, observe_thunk = 0;
+uint32_t request_thunk = 0, observe_thunk = 0, cheat_request_thunk = 0;
 
 bool Span(uint8_t* base, uint32_t address, size_t size, bool write = false) {
   if (!base || !address || !size || uint64_t(address) + size > uint64_t(UINT32_MAX) + 1)
@@ -206,7 +208,8 @@ struct Text {
   std::string_view key, value;
   uint32_t address = 0, key_address = 0;
 };
-std::array texts = {Text{"LR_QSAVE", "Quicksave"},
+std::vector<Text> texts = [] {
+  std::vector<Text> result = {Text{"LR_QSAVE", "Quicksave"},
                     Text{"LR_QOFF", "Quicksave is disabled."},
                     Text{"LR_QNET", "Quicksave is only available in single-player."},
                     Text{"LR_QMISS", "You cannot save during a mission or mission replay."},
@@ -216,7 +219,12 @@ std::array texts = {Text{"LR_QSAVE", "Quicksave"},
                     Text{"LR_QCALL", "Finish the phone call before saving."},
                     Text{"LR_QWANT", "Lose your wanted level before saving."},
                     Text{"LR_QWAIT", "Quicksave was cancelled because the game state changed."},
-                    Text{"LR_QERR", "Quicksave is unavailable right now. Try again in free roam."}};
+                    Text{"LR_QERR", "Quicksave is unavailable right now. Try again in free roam."},
+                    Text{"LR_CHEAT", "Trucos / Cheats"}};
+  for (size_t i = 0; i < gta4::phone_cheats::kCatalog.size(); ++i)
+    result.push_back(Text{gta4::phone_cheats::kLabelKeys[i], gta4::phone_cheats::kCatalog[i].label});
+  return result;
+}();
 rex::memory::Memory* text_memory = nullptr;
 uint32_t text_pool = 0;
 bool EnsureText(uint8_t* base) {
@@ -426,6 +434,25 @@ void NativeObserve(PPCContext& ctx, uint8_t* base) {
     REXLOG_INFO("gta4-quicksave: phone menu built episode={} entries={} label=Quicksave action={}",
                 profile->name, count, kQuicksaveAction);
 }
+// Called only by the patched stock state-1032 accept branch. Menu construction,
+// scrolling and Back never reach this thunk or the guarded cheat queue.
+void NativeCheatRequest(PPCContext& ctx, uint8_t* base) {
+  const auto* profile = CallerProfile(ctx, base);
+  StoreResult(ctx, base, 0);
+  if (!profile || profile->episode != 0 || !Span(base, kGlobals, 4)) return;
+  const auto thread = Read(base, kExecutingThread), globals = Read(base, kGlobals);
+  const auto locals = Read(base, thread + kThreadLocals);
+  const auto selected = profile->menu_local * 4 + 60;
+  if (!Span(base, globals, profile->phone_global * 4 + 4) ||
+      !Span(base, locals, selected + 4) ||
+      Read(base, globals + profile->phone_global * 4) != gta4::phone_cheats::kMenuState)
+    return;
+  const auto* entry = gta4::phone_cheats::FromAction(Read(base, locals + selected));
+  if (!entry) return;
+  // QueueCheat performs the same registration/context checks as the existing UI.
+  // Mark the request while holding the queue lock in QueuePhoneCheat below.
+  StoreResult(ctx, base, QueuePhoneCheat(entry->index) ? 1 : 0);
+}
 bool EnsureThunks() {
   std::lock_guard lock(state_mutex);
   auto* runtime = rex::Runtime::instance();
@@ -436,7 +463,9 @@ bool EnsureThunks() {
     request_thunk = dispatcher->AllocateThunk(NativeRequest, 0x82846780);
   if (!observe_thunk)
     observe_thunk = dispatcher->AllocateThunk(NativeObserve, 0x82846780);
-  return request_thunk && observe_thunk;
+  if (!cheat_request_thunk)
+    cheat_request_thunk = dispatcher->AllocateThunk(NativeCheatRequest, 0x82846780);
+  return request_thunk && observe_thunk && cheat_request_thunk;
 }
 void ResetWorld() {
   rex::cvar::SetFlagByName("gta4_completion_percent","-1");rex::cvar::SetFlagByName("gta4_completion_episode","-1");
@@ -546,7 +575,7 @@ void ObserveNativeRegistration(PPCContext& context, uint8_t* base) {
       return;
     }
 }
-bool QueueCheat(uint32_t index){
+bool QueueCheatImpl(uint32_t index, bool phone_origin){
   // Base-game native cheat indices, 5 is the nonfunctional money placeholder.
   const auto reject=[&](const char* reason){rex::cvar::SetFlagByName("gta4_cheat_status",reason);REXLOG_WARN("gta4-cheats: index={} rejected={}",index,reason);return false;};
   if(!gta4::cheats::SupportedIndex(index))return reject("Unavailable: unsupported cheat");
@@ -555,10 +584,13 @@ bool QueueCheat(uint32_t index){
   if(!gta4::cheats::CanQueue(context))return reject("Unavailable: return to active single-player gameplay");
   std::lock_guard lock(cheat_mutex);if(pending_cheat)return reject("Pending: another cheat is waiting for Resume");
   pending_cheat=gta4::cheats::Request{index,world_epoch.load(),Now()+10000,context.player_identity,context.player_generation,++cheat_serial};
+  pending_cheat->phone_origin = phone_origin;
   has_pending_cheat.store(true,std::memory_order_release);
   rex::cvar::SetFlagByName("gta4_cheat_status","Queued: waiting for gameplay to resume");
   REXLOG_INFO("gta4-cheats: request={} action=\"{}\" index={} queued world={} frame={} player={:08X}",pending_cheat->serial,gta4::cheats::Name(index),index,pending_cheat->world,context.epoch,context.player_identity);return true;
 }
+bool QueueCheat(uint32_t index) { return QueueCheatImpl(index, false); }
+bool QueuePhoneCheat(uint32_t index) { return QueueCheatImpl(index, true); }
 std::string CheatStatus(){return rex::cvar::GetFlagByName("gta4_cheat_status");}
 void PollCompletion(PPCContext& parent,uint8_t* base){
   static uint64_t next=0,last_write=0;const auto now=Now();if(now<next||inside_cheat)return;next=now+2000;
@@ -577,7 +609,12 @@ void PollCheats(PPCContext& parent,uint8_t* base){
   {
     std::lock_guard lock(cheat_mutex);if(!pending_cheat)return;
     const auto context=gta4::input::GetTouchContextSnapshot();
-    const auto decision=gta4::cheats::Decide(*pending_cheat,context,Now(),world_epoch.load());
+    const auto& phone = kPhoneProfiles[0];
+    const auto globals = Span(base, kGlobals, 4) ? Read(base, kGlobals) : 0;
+    const bool phone_closed = Span(base, kPhoneCreated, 1) && !Byte(base, kPhoneCreated) &&
+        Span(base, globals, phone.phone_global * 4 + 4) &&
+        Read(base, globals + phone.phone_global * 4) == kClosedPhoneState;
+    const auto decision=gta4::cheats::Decide(*pending_cheat,context,Now(),world_epoch.load(),phone_closed);
     if(decision==gta4::cheats::Decision::kCancel){
       REXLOG_WARN("gta4-cheats: request={} index={} cancelled expired={} world_changed={} loading={} cutscene={}",pending_cheat->serial,pending_cheat->index,Now()>=pending_cheat->expires,pending_cheat->world!=world_epoch.load(),context.loading,context.cutscene);
       pending_cheat.reset();has_pending_cheat.store(false,std::memory_order_release);rex::cvar::SetFlagByName("gta4_cheat_status","Cancelled: timed out or gameplay state changed");return;
@@ -613,7 +650,7 @@ void PollCheats(PPCContext& parent,uint8_t* base){
 }
 bool ResolveText(PPCContext& context, uint8_t* base) {
   const auto key = String(base, context.r4.u32, 16);
-  if (!key.starts_with("LR_Q"))
+  if (!key.starts_with("LR_Q") && !key.starts_with("LR_C"))
     return false;
   bool known = false;
   for (const auto& text : texts)
@@ -660,7 +697,7 @@ extern "C" void sub_828453F8(PPCContext& ctx, uint8_t* base) {
       REXLOG_WARN("gta4-touch-activity: unknown script={} size={} sha256={}; generic controls retained",
                   loading->activity_name, ctx.r4.u32, digest);
   }
-  if (loading && loading->phone && REXCVAR_GET(gta4_quicksave) && ctx.r4.u32 <= kMaxSCO &&
+  if (loading && loading->phone && ctx.r4.u32 <= kMaxSCO &&
       Span(base, ctx.r3.u32, ctx.r4.u32)) {
     const std::string_view data(
         reinterpret_cast<const char*>(rex::memory::GuestPtr(base, ctx.r3.u32)), ctx.r4.u32);
@@ -716,7 +753,17 @@ extern "C" void sub_82846780(PPCContext& ctx, uint8_t* base) {
   PhonePatch patch;
   try {
     patch = BuildPhonePatch({rex::memory::GuestPtr(base, ctx.r5.u32), ctx.r6.u32}, *profile,
-                            request_thunk, observe_thunk);
+                            request_thunk, observe_thunk, REXCVAR_GET(gta4_quicksave));
+    if (profile->episode == 0) {
+      try {
+        patch = gta4::phone_cheats::BuildCheatsPatch(
+            {rex::memory::GuestPtr(base, ctx.r5.u32), ctx.r6.u32}, *profile,
+            patch, cheat_request_thunk, NativeAddress("ACTIVATE_CHEAT"));
+        REXLOG_INFO("gta4-phone-cheats: prepared 25 entries in stock state 1032; awaiting program publication");
+      } catch (const std::exception& error) {
+        REXLOG_ERROR("gta4-phone-cheats: contract rejected; stock Cheats retained: {}", error.what());
+      }
+    }
     temporary = memory->SystemHeapAlloc(uint32_t(patch.code.size()));
   } catch (const std::exception& error) {
     REXLOG_ERROR("gta4-quicksave: phone extension rejected; original retained: {}", error.what());

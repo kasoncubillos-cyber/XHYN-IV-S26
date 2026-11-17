@@ -110,6 +110,8 @@ add_executable(unit_tests
     system/gta4_frontend_menu_policy_test.cpp
     system/gta4_aspect_policy_test.cpp
     system/gta4_quicksave_policy_test.cpp
+    system/gta4_phone_cheat_catalog_test.cpp
+    system/gta4_phone_cheat_patch_test.cpp
     system/gta4_draw_distance_policy_test.cpp
     system/gta4_frame_limiter_test.cpp
     rexglue/presentation_rate_limit_test.cpp

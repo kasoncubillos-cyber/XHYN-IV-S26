@@ -102,7 +102,8 @@ inline void Native(std::vector<uint8_t>& v, uint32_t linked_thunk, uint8_t argum
 }  // namespace bytecode
 
 inline PhonePatch BuildPhonePatch(std::span<const uint8_t> linked, const PhoneProfile& p,
-                                  uint32_t request_thunk, uint32_t observe_thunk) {
+                                  uint32_t request_thunk, uint32_t observe_thunk,
+                                  bool quicksave_enabled = true) {
   using namespace bytecode;
   const auto fits = [&](uint32_t offset, size_t size) {
     return offset <= linked.size() && size <= linked.size() - offset;
@@ -129,6 +130,7 @@ inline PhonePatch BuildPhonePatch(std::span<const uint8_t> linked, const PhonePr
   auto& v = out.code;
   v.reserve(linked.size() + 256);
   out.append_extension = uint32_t(v.size());
+  if (quicksave_enabled) {
   Local(v, p.menu_local);
   Local(v, p.options_local);
   Int(v, kQuicksaveAction);
@@ -142,6 +144,7 @@ inline PhonePatch BuildPhonePatch(std::span<const uint8_t> linked, const PhonePr
     Int(v, 0);
   }
   Branch(v, kCall, p.append_function);
+  }
   Int(v, int32_t(p.episode));
   Native(v, observe_thunk, 1, 0);
   v.insert(v.end(), append_expected.begin(), append_expected.end());

@@ -1,0 +1,244 @@
+name: S26 Phone Cheats - Native Validation
+
+on:
+  push:
+    branches:
+      - feature/s26-telefono-cheats-v105
+    paths:
+      - .github/workflows/s26-phone-native-ci.yml
+      - glue/rexglue-sdk-main/gta4-recomp/src/gta4_phone_cheat*.h
+      - glue/rexglue-sdk-main/gta4-recomp/src/gta4_cheat_policy.h
+      - glue/rexglue-sdk-main/tests/unit/system/gta4_phone_cheat_patch_test.cpp
+      - glue/rexglue-sdk-main/tests/unit/CMakeLists.txt
+      - glue/rexglue-sdk-main/tests/unit/system/gta4_phone_cheat_catalog_test.cpp
+      - glue/rexglue-sdk-main/gta4-recomp/src/gta4_phone_quicksave_profiles.h
+      - glue/rexglue-sdk-main/gta4-recomp/src/gta4_quicksave_hooks.cpp
+      - docs/android/S26-TELEFONO-TRUCOS-V105.md
+      - os/android/app/src/main/java/com/libertyrecomp/PhoneScriptExport.java
+      - os/android/app/src/main/java/com/libertyrecomp/LauncherActivity.java
+      - os/android/app/build.gradle.kts
+      - tools/test_s26_phone_program.cpp
+      - tools/fixtures/PhoneScriptExportTest.java
+      - tools/run_android_java_tests.py
+  workflow_dispatch:
+    inputs:
+      build_native:
+        description: 'Compile full ARM64 engine only (no APK, signing or distribution)'
+        type: boolean
+        default: false
+        required: true
+      diagnostic_apk:
+        description: 'Authorized signed diagnostic v104 update, with v102 certificate comparison'
+        type: boolean
+        default: false
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: s26-phone-native-ci-${{ github.event_name }}
+  cancel-in-progress: true
+
+jobs:
+  catalog:
+    name: Check phone catalog, stock-menu adapter and Quicksave
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile standalone C++20 test
+        run: |
+          set -euo pipefail
+          g++ -std=c++20 -O2 -Wall -Wextra -Werror -DGTA4_PHONE_CHEATS_STANDALONE \
+            glue/rexglue-sdk-main/tests/unit/system/gta4_phone_cheat_catalog_test.cpp \
+            -o /tmp/s26-phone-cheat-catalog-test
+          /tmp/s26-phone-cheat-catalog-test
+      - name: Check stock phone adapter and Quicksave regression
+        run: |
+          set -euo pipefail
+          g++ -std=c++20 -O2 -Wall -Wextra -Werror \
+            -Iglue/rexglue-sdk-main/gta4-recomp/src -Iglue/rexglue-sdk-main/include \
+            -DGTA4_PHONE_CHEATS_STANDALONE \
+            glue/rexglue-sdk-main/tests/unit/system/gta4_phone_cheat_patch_test.cpp \
+            -o /tmp/s26-phone-patch-test
+          /tmp/s26-phone-patch-test
+          g++ -std=c++20 -O2 -DGTA4_QUICKSAVE_STANDALONE \
+            glue/rexglue-sdk-main/tests/unit/system/gta4_quicksave_policy_test.cpp \
+            -o /tmp/s26-quicksave-test
+          /tmp/s26-quicksave-test
+      - name: Compile optional private Xbox program validator
+        run: |
+          g++ -std=c++20 -O2 -Wall -Wextra -Werror \
+            -Iglue/rexglue-sdk-main/gta4-recomp/src -Iglue/rexglue-sdk-main/thirdparty \
+            tools/test_s26_phone_program.cpp -o /tmp/s26-real-phone
+      - name: Verify native and Android cheat IDs remain identical
+        run: |
+          python3 - <<'PY'
+          import re
+          from pathlib import Path
+          native=Path('glue/rexglue-sdk-main/gta4-recomp/src/gta4_phone_cheat_catalog.h').read_text()
+          java=Path('os/android/app/src/main/java/com/libertyrecomp/CheatsUi.java').read_text()
+          ids=[int(i) for i in re.search(r'IDS\s*=\s*\{([^}]*)\}',java).group(1).split(',')]
+          native_ids=[int(i) for i in re.findall(r'^\s*\{(\d+),\s*"',native,re.MULTILINE)]
+          assert len(ids)==25 and ids==native_ids, (ids,native_ids)
+          print('Android and native catalog agree on all 25 cheat IDs')
+          PY
+      - name: Check stable update identity
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import re
+          from pathlib import Path
+          gradle=Path('os/android/app/build.gradle.kts').read_text()
+          pkg=re.search(r'applicationId\s*=\s*"([^"]+)"',gradle).group(1)
+          version=int(re.search(r'versionCode\s*=\s*(\d+)',gradle).group(1))
+          assert pkg=='com.kasoncubillos.xhynivs26stable',pkg
+          assert version>=104,version
+          print(f'Preserved stable package {pkg}, versionCode {version}')
+          PY
+
+  native:
+    name: Fresh ARM64 engine (optional authorized diagnostic APK)
+    permissions:
+      contents: write
+    if: github.event_name == 'workflow_dispatch' && inputs.build_native == true
+    needs: catalog
+    runs-on: ubuntu-24.04
+    timeout-minutes: 330
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: false
+          persist-credentials: false
+      - name: Verify diagnostic release preconditions
+        if: inputs.diagnostic_apk == true
+        env:
+          KEYSTORE_B64: ${{ secrets.XHYN_S26_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.XHYN_S26_KEYSTORE_PASSWORD }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test -n "$KEYSTORE_B64" && test -n "$KEYSTORE_PASSWORD"
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          text=Path('os/android/app/build.gradle.kts').read_text()
+          assert re.search(r'applicationId\s*=\s*"com.kasoncubillos.xhynivs26stable"',text)
+          assert int(re.search(r'versionCode\s*=\s*(\d+)',text).group(1))==104
+          assert 'phone-diagnostics' in text
+          PY
+          if gh release view s26-phone-diagnostics-v104-r2 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo '::error::Diagnostic release already exists; do not replace its installer.'
+            exit 1
+          fi
+      - name: Recover build disk
+        run: |
+          sudo rm -rf /usr/share/dotnet /opt/hostedtoolcache/CodeQL /usr/local/share/powershell
+          df -h .
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - name: Install NDK, SDK and builders
+        run: |
+          set -euo pipefail
+          sdkmanager --licenses >/dev/null <<<'y' || true
+          sdkmanager 'platforms;android-35' 'build-tools;35.0.0' 'ndk;29.0.14206865'
+          python -m pip install --disable-pip-version-check 'cmake==3.31.6' ninja
+          echo "ANDROID_SDK_ROOT=$ANDROID_HOME" >> "$GITHUB_ENV"
+          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/29.0.14206865" >> "$GITHUB_ENV"
+          echo "ANDROID_NDK=$ANDROID_HOME/ndk/29.0.14206865" >> "$GITHUB_ENV"
+      - name: Fetch pinned engine dependencies
+        run: python3 tools/setup_repo.py
+      - name: Android UI unit tests
+        working-directory: os/android
+        run: ./gradlew --no-daemon --max-workers=2 :app:testDebugUnitTest
+      - name: Check Java export and save preservation regressions
+        run: python3 tools/run_android_java_tests.py
+      - name: Compile native game ARM64 (no Alpha1 reuse)
+        env:
+          BUILD_TYPE: Release
+        run: bash os/android/scripts/build_native.sh 2
+      - name: Build Vulkan driver proxy
+        run: bash os/android/scripts/build_driver_proxy.sh
+      - name: Record freshly built ARM64 engine
+        run: |
+          set -euo pipefail
+          file os/android/app/src/main/jniLibs/arm64-v8a/libmain.so
+          sha256sum os/android/app/src/main/jniLibs/arm64-v8a/*.so
+          echo "Fresh ARM64 libraries built from $GITHUB_SHA. APK signing requires diagnostic_apk=true." >> "$GITHUB_STEP_SUMMARY"
+      - name: Package freshly compiled diagnostic update
+        if: inputs.diagnostic_apk == true
+        run: |
+          set -euo pipefail
+          mkdir -p out
+          python3 os/android/scripts/package_release.py --unsigned --output out/S26-diagnostic-unsigned.apk
+      - name: Sign permanently and verify update identity against installed v102
+        if: inputs.diagnostic_apk == true
+        env:
+          KEYSTORE_B64: ${{ secrets.XHYN_S26_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.XHYN_S26_KEYSTORE_PASSWORD }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release download s26-update-v102 --repo "$GITHUB_REPOSITORY" \
+            --pattern XHYN-IV-S26-update-v102.apk --dir out/v102
+          KS="$RUNNER_TEMP/xhyn-s26-stable.p12"
+          PASS="$RUNNER_TEMP/xhyn-s26-stable-pass.txt"
+          trap 'rm -f "$KS" "$PASS"' EXIT
+          printf '%s' "$KEYSTORE_B64" | base64 -d > "$KS"
+          printf '%s' "$KEYSTORE_PASSWORD" > "$PASS"
+          chmod 600 "$KS" "$PASS"
+          APK=out/XHYN-IV-S26-telefono-r2-v104.apk
+          java -jar "$ANDROID_HOME/build-tools/35.0.0/lib/apksigner.jar" sign \
+            --ks "$KS" --ks-key-alias xhyn-s26-stable --ks-pass "file:$PASS" \
+            --v4-signing-enabled false --out "$APK" out/S26-diagnostic-unsigned.apk
+          java -jar "$ANDROID_HOME/build-tools/35.0.0/lib/apksigner.jar" verify \
+            --verbose --print-certs "$APK" > out/diagnostic-certificate.txt
+          java -jar "$ANDROID_HOME/build-tools/35.0.0/lib/apksigner.jar" verify \
+            --verbose --print-certs out/v102/XHYN-IV-S26-update-v102.apk > out/v102-certificate.txt
+          "$ANDROID_HOME/build-tools/35.0.0/aapt2" dump badging "$APK" > out/diagnostic-badging.txt
+          "$ANDROID_HOME/build-tools/35.0.0/aapt2" dump badging out/v102/XHYN-IV-S26-update-v102.apk > out/v102-badging.txt
+          "$ANDROID_HOME/build-tools/35.0.0/zipalign" -c -P 16 4 "$APK"
+          python3 - <<'PY'
+          from pathlib import Path
+          import re,zipfile,hashlib
+          def cert(name):
+              return re.findall(r'Signer #\d+ certificate SHA-256 digest: ([0-9a-fA-F]+)',Path(name).read_text())
+          old,new=cert('out/v102-certificate.txt'),cert('out/diagnostic-certificate.txt')
+          assert len(old)==1 and old==new, 'Permanent signing certificate differs from v102'
+          def identity(name):
+              return re.search(r"package: name='([^']+)' versionCode='(\d+)'",Path(name).read_text()).groups()
+          assert identity('out/v102-badging.txt')==('com.kasoncubillos.xhynivs26stable','102')
+          assert identity('out/diagnostic-badging.txt')==('com.kasoncubillos.xhynivs26stable','104')
+          with zipfile.ZipFile('out/XHYN-IV-S26-telefono-r2-v104.apk') as apk:
+              for source in Path('out/apk-release/lib/arm64-v8a').glob('*.so'):
+                  assert hashlib.sha256(source.read_bytes()).digest()==hashlib.sha256(apk.read('lib/arm64-v8a/'+source.name)).digest(),source
+          print('Verified v102 certificate, same application ID, version 104 > 102 and current built native libraries')
+          PY
+          sha256sum "$APK" > out/S26-diagnostico-SHA256.txt
+      - name: Publish authorized diagnostic installer
+        if: inputs.diagnostic_apk == true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          cat > out/diagnostic-notes.md <<'EOF'
+          Revisión R2 para instalar encima de v102 o de la primera APK de diagnóstico v104. Conserva com.kasoncubillos.xhynivs26stable y el mismo certificado permanente de v102. Motor ARM64 reconstruido desde el código corregido, sin reutilizar Alpha1.
+
+          Corregido el destino Cheats de Xbox a estado 1032, comprobado contra el spcellphonemain.sco real proporcionado por el propietario. Las comprobaciones del programa real validan 25 entradas, listado sin solicitudes, aceptación única, cierre condicionado y conservación del código de navegación y Quicksave. Las pruebas de emisión no certifican los efectos dentro del juego.
+
+          Para probar: entra en juego libre, saca el teléfono original de Niko y busca Trucos / Cheats. Comprueba las 25 opciones sin marcar números, vuelve atrás sin activar nada y después prueba una opción. Comunica el resultado en el chat. Sigue siendo v104 de pruebas; v105 no se declara lista hasta completar las pruebas en Galaxy S26.
+          EOF
+          gh release create s26-phone-diagnostics-v104-r2 \
+            out/XHYN-IV-S26-telefono-r2-v104.apk out/S26-diagnostico-SHA256.txt \
+            --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+            --title 'S26: teléfono de Niko corregido para Xbox · R2 v104' \
+            --prerelease --notes-file out/diagnostic-notes.md

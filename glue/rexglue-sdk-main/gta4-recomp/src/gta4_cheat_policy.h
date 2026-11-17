@@ -13,6 +13,7 @@ struct Request {
   uint64_t world, expires;
   uint32_t player_identity = 0, player_generation = 0;
   uint64_t serial=0;
+  bool phone_origin = false;
 };
 
 enum class Decision { kWait, kCancel, kExecute };
@@ -40,7 +41,7 @@ inline bool CanQueue(const input::TouchContextSnapshot& context) noexcept {
 
 inline Decision Decide(const Request& request,
                        const input::TouchContextSnapshot& context,
-                       uint64_t now, uint64_t world) noexcept {
+                       uint64_t now, uint64_t world, bool phone_closed = true) noexcept {
   if (!SupportedIndex(request.index) || now >= request.expires ||
       world != request.world || context.loading || context.cutscene || context.frontend ||
       (context.valid && request.player_identity &&
@@ -49,7 +50,7 @@ inline Decision Decide(const Request& request,
     return Decision::kCancel;
   // context.epoch advances every input capture. It is a frame counter, not a
   // world identity, and must never invalidate a request waiting for Resume.
-  return CanQueue(context) && context.gameplay_allowed ? Decision::kExecute
+  return CanQueue(context) && context.gameplay_allowed && (!request.phone_origin || phone_closed) ? Decision::kExecute
                                                      : Decision::kWait;
 }
 
