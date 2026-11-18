@@ -1,0 +1,157 @@
+name: S26 Ultra Visual v109 - prueba firmada compatible con v108
+
+on:
+  push:
+    branches:
+      - feature/s26-ultra-visual-v109-fix-installer
+    paths:
+      - .github/workflows/s26-ultra-visual-v109-test.yml
+      - os/android/app/build.gradle.kts
+      - os/android/app/src/main/java/com/libertyrecomp/**
+      - os/android/app/src/test/java/com/libertyrecomp/**
+      - os/android/scripts/**
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: s26-ultra-visual-v109-private-test
+  cancel-in-progress: true
+
+jobs:
+  signed-test-apk:
+    name: Verificar, firmar y guardar APK privada v109
+    runs-on: ubuntu-24.04
+    timeout-minutes: 95
+    steps:
+      - name: Obtener codigo
+        uses: actions/checkout@v4
+        with:
+          submodules: false
+          persist-credentials: false
+      - name: JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Android SDK y dependencias
+        uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - name: Preparar herramientas
+        run: |
+          set -euo pipefail
+          sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+          git submodule update --init glue/rexglue-sdk-main/thirdparty/sdl3
+          echo "ANDROID_SDK_ROOT=$ANDROID_HOME" >> "$GITHUB_ENV"
+      - name: Comprobar identidad y perfil experimental
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          gradle=Path('os/android/app/build.gradle.kts').read_text()
+          assert re.search(r'applicationId\s*=\s*"com.kasoncubillos.xhynivs26stable"',gradle)
+          assert re.search(r'versionCode\s*=\s*109\b',gradle)
+          preset=Path('os/android/app/src/main/java/com/libertyrecomp/S26GraphicsProfiles.java').read_text()
+          ui=Path('os/android/app/src/main/java/com/libertyrecomp/MobileSettingsUi.java').read_text()
+          assert 'case ULTRA_SUSTAINED_VISUAL:' in preset
+          assert 'S26 Ultra visual sostenido (experimental)' in ui
+          assert 'gta4_anisotropic_filtering' in ui
+          print('Identidad y perfil experimental comprobados.')
+          PY
+      - name: Pruebas Java sin dependencias remotas
+        run: |
+          set -euo pipefail
+          python3 tools/run_android_java_tests.py
+      - name: Compilacion completa de interfaz y fuentes Java de Android
+        run: |
+          set -euo pipefail
+          python3 tools/check_android_ui.py \
+            --android-jar "$ANDROID_HOME/platforms/android-35/android.jar" \
+            --aapt2 "$ANDROID_HOME/build-tools/35.0.0/aapt2"
+      - name: Descargar motor v106 con hash fijado
+        run: |
+          set -euo pipefail
+          mkdir -p out
+          curl -fL --retry 3 --retry-delay 3 \
+            "https://github.com/$GITHUB_REPOSITORY/releases/download/s26-radv19-claridad-v106/XHYN-IV-S26-radv19-claridad-v106.apk" \
+            -o out/signed-v106.apk
+          echo "8f61c5f81afadd448959f7cf1b9c0734bf16ef5d09e4f03916d5ff3de4df3fc9  out/signed-v106.apk" | sha256sum -c -
+      - name: Descargar APK privada v108 instalada para validar actualizacion
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p out/previous-v108
+          gh run download 44203085463 --repo "$GITHUB_REPOSITORY" \
+            --name XHYN-S26-v108-ciudad-visible-SIGNED --dir out/previous-v108
+          test -s out/previous-v108/XHYN-IV-S26-ciudad-visible-sostenida-v108.apk
+
+      - name: Compilar APK v109 conservando motor ARM64 y ajustes v108
+        run: |
+          set -euo pipefail
+          python3 os/android/scripts/package_release.py \
+            --native-apk out/signed-v106.apk \
+            --native-apk-sha256 8f61c5f81afadd448959f7cf1b9c0734bf16ef5d09e4f03916d5ff3de4df3fc9 \
+            --unsigned --output out/s26-ultra-visual-v109-unsigned.apk
+      - name: Firmar y verificar contra v106
+        env:
+          KEYSTORE_B64: ${{ secrets.XHYN_S26_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.XHYN_S26_KEYSTORE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [ -z "$KEYSTORE_B64" ] || [ -z "$KEYSTORE_PASSWORD" ]; then
+            echo "::error::Faltan los secretos de firma permanente; no se publicara una APK sin firmar."
+            exit 1
+          fi
+          KS="$RUNNER_TEMP/s26-private-v107.p12"
+          PASS="$RUNNER_TEMP/s26-private-v107.pass"
+          trap 'rm -f "$KS" "$PASS"' EXIT
+          printf '%s' "$KEYSTORE_B64" | base64 -d > "$KS"
+          printf '%s' "$KEYSTORE_PASSWORD" > "$PASS"
+          chmod 600 "$KS" "$PASS"
+          APK=out/XHYN-IV-S26-ultra-visual-v109-test.apk
+          java -jar "$ANDROID_HOME/build-tools/35.0.0/lib/apksigner.jar" sign \
+            --ks "$KS" --ks-key-alias xhyn-s26-stable \
+            --ks-pass "file:$PASS" --v4-signing-enabled false \
+            --out "$APK" out/s26-ultra-visual-v109-unsigned.apk
+          java -jar "$ANDROID_HOME/build-tools/35.0.0/lib/apksigner.jar" verify \
+            --verbose --print-certs "$APK" > out/new-certificate.txt
+          java -jar "$ANDROID_HOME/build-tools/35.0.0/lib/apksigner.jar" verify \
+            --verbose --print-certs out/previous-v108/XHYN-IV-S26-ciudad-visible-sostenida-v108.apk > out/v108-certificate.txt
+          "$ANDROID_HOME/build-tools/35.0.0/aapt2" dump badging "$APK" > out/new-badging.txt
+          "$ANDROID_HOME/build-tools/35.0.0/aapt2" dump badging out/previous-v108/XHYN-IV-S26-ciudad-visible-sostenida-v108.apk > out/v108-badging.txt
+          "$ANDROID_HOME/build-tools/35.0.0/zipalign" -c -P 16 4 "$APK"
+          python3 - <<'PY'
+          from pathlib import Path
+          import re, zipfile, hashlib
+          def cert(path):
+              return re.findall(r'Signer #\d+ certificate SHA-256 digest: ([0-9a-fA-F]+)',Path(path).read_text())
+          old,new=cert('out/v108-certificate.txt'),cert('out/new-certificate.txt')
+          assert len(old)==1 and old==new, 'Signature differs from the installed update v106'
+          def ident(path):
+              return re.search(r"package: name='([^']+)' versionCode='(\d+)'",Path(path).read_text()).groups()
+          assert ident('out/v108-badging.txt')==('com.kasoncubillos.xhynivs26stable','108')
+          assert ident('out/new-badging.txt')==('com.kasoncubillos.xhynivs26stable','109')
+          with zipfile.ZipFile('out/previous-v108/XHYN-IV-S26-ciudad-visible-sostenida-v108.apk') as old_apk, zipfile.ZipFile('out/XHYN-IV-S26-ultra-visual-v109-test.apk') as new_apk:
+              libs=[p for p in old_apk.namelist() if p.startswith('lib/arm64-v8a/')]
+              assert len(libs)==11
+              for p in libs:
+                  assert hashlib.sha256(old_apk.read(p)).digest()==hashlib.sha256(new_apk.read(p)).digest(),p
+          print('Certificado, identidad, version 109 y bibliotecas ARM64 desde v108 conservadas correctamente.')
+          PY
+          sha256sum "$APK" > out/XHYN-IV-S26-ultra-visual-v109-SHA256.txt
+          echo "APK privada v109 firmada y verificada. No se publico ninguna release." >> "$GITHUB_STEP_SUMMARY"
+      - name: Guardar solo APK firmada, sin Release
+        uses: actions/upload-artifact@v4
+        with:
+          name: S26-ultra-visual-v109-signed-private
+          path: |
+            out/XHYN-IV-S26-ultra-visual-v109-test.apk
+            out/XHYN-IV-S26-ultra-visual-v109-SHA256.txt
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0

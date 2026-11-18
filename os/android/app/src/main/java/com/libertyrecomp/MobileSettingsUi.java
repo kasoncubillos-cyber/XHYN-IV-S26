@@ -24,6 +24,8 @@ final class MobileSettingsUi {
         new Choice("gta4_fsr1_sharpness_reduction","FSR softness","0.2",true,0,2,.05),
         new Choice("gta4_native_anti_aliasing","Anti-aliasing","fxaa",false,"off","fxaa","smaa"),
         new Choice("gta4_native_smaa_quality","SMAA quality","low",false,"low","medium","high","ultra"),
+        new Choice("gta4_texture_filtering","Texture filtering","trilinear",false,"bilinear","trilinear"),
+        new Choice("gta4_anisotropic_filtering","Anisotropic filtering","1x",false,"1x","2x","4x","8x","16x"),
         new Choice("gta4_present_mode","VSync","immediate",false,"vsync","immediate"),
         new Choice("gta4_frame_limit","Frame limit","30",false,"0","20","24","25","30","40","45","60","90","120"),
         new Choice("gta4_dynamic_draw_distance","Adaptive draw distance","true",false,"true","false"),
@@ -95,6 +97,15 @@ final class MobileSettingsUi {
         new Choice("gta4_touch_radar_margin","Minimap vertical offset","-0.06",false,-.2,.15,.005)
     };
     private static final Choice[] PERFORMANCE={
+        // All streaming keys used by the S26 experimental preset must be
+        // listed here: the settings dialog persists only declared choices.
+        new Choice("gta4_streaming_modern","Early world streaming","true",true,"true","false"),
+        new Choice("gta4_streaming_deadline_order","Streaming request priority","true",true,"true","false"),
+        new Choice("gta4_streaming_budget_scale","Streaming budget scale","1.5",true,1,4,.25),
+        new Choice("gta4_streaming_physical_reserve_mb","Streaming reserved RAM MB","16",true,0,256,16),
+        new Choice("gta4_streaming_preload_min","Near preload margin","100",true,50,500,10),
+        new Choice("gta4_streaming_preload_max","Driving preload margin","250",true,50,500,10),
+        new Choice("gta4_streaming_prefetch_pending_limit","Extra pending request cap","256",true,16,4096,16),
         new Choice("gta4_performance_overlay","Performance overlay","off",false,"off","fps","detailed"),
         new Choice("gta4_overlay_position","Overlay position","top_right",false,"top_left","top_center","top_right","bottom_left","bottom_center","bottom_right","custom"),
         new Choice("gta4_overlay_edge_gap","Overlay edge gap","2",false,0,40,1),
@@ -201,6 +212,11 @@ final class MobileSettingsUi {
             if(selected[0].equals("Graphics")&&query.isEmpty()){
                 // Show the latest player-tested profiles first; keep old profiles usable in code,
                 // but remove their redundant one-tap tiles from this launcher.
+                ModernUi.gridAction(a,rows,"S26 Ultra visual sostenido (experimental)",()->ModernUi.builder(a)
+                    .setTitle("Ultra visual · objetivo 60 FPS")
+                    .setMessage("Prioriza la calidad espacial máxima del perfil S26: 1080p nativos (sin reescalado), SMAA Ultra, filtrado anisotrópico 16x, sombras 1024, reflejos completos y distancia 1,4x fija. Para reducir microtirones prepara shaders, activa caché de texturas y adelanta solicitudes de streaming; los reflejos se actualizan cada 2 fotogramas. Conserva protección térmica, no fuerza GPU Turbo y fija el objetivo en 60 FPS. IMPORTANTE: la máxima calidad puede provocar bajadas de FPS por temperatura; no se garantizan 60 constantes. Guarda, reinicia y prueba durante al menos 20 minutos.")
+                    .setNegativeButton("Cancelar",null)
+                    .setPositiveButton("Probar Ultra visual", (d,w)->{S26GraphicsProfiles.apply(draft,S26GraphicsProfiles.ULTRA_SUSTAINED_VISUAL);updatePending.run();render[0].run();}).show());
                 ModernUi.gridAction(a,rows,"S26 60 FPS ciudad visible",()->ModernUi.builder(a)
                     .setTitle("60 FPS · Ciudad más visible")
                     .setMessage("Prueba de ciudad visible con controlador System/Automatic: objetivo 60 FPS, salida 1080p y FSR Ultra Quality con menor suavidad; distancia estable 1,15× y caché de texturas reutilizables mientras haya memoria. No reducimos la distancia al caer los FPS; la protección térmica de Android sigue activa y puede limitarla si el móvil se calienta. Se mantienen audio 32 y tus trucos. Más ciudad visible puede exigir CPU/GPU y batería: no garantiza 60 FPS ni mejora la velocidad real de lectura del mapa. Con RADV importado se mantienen sus ajustes experimentales separados. Guarda y reinicia.")
