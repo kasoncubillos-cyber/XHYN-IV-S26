@@ -1,0 +1,90 @@
+name: S26 Android installer compatibility audit
+
+on:
+  push:
+    branches:
+      - feature/s26-ultra-visual-sostenido-v1
+    paths:
+      - .github/workflows/s26-apk-update-diagnostics.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  compare-apk-identities:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - run: sdkmanager 'build-tools;35.0.0'
+      - name: Download published versions and latest signed v107
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p out
+          for item in \
+            'v100 s26-update-v100 XHYN-IV-S26-update-v100.apk' \
+            'v104 s26-update-v104 XHYN-IV-S26-update-v104.apk' \
+            'v105 s26-sostenido-audio-v105 XHYN-IV-S26-sostenido-audio-v105.apk' \
+            'v106 s26-radv19-claridad-v106 XHYN-IV-S26-radv19-claridad-v106.apk'
+          do
+            read -r ver tag file <<< "$item"
+            curl -fLsS --retry 3 "https://github.com/$GITHUB_REPOSITORY/releases/download/$tag/$file" -o "out/$ver.apk"
+          done
+          mkdir -p out/v107
+          gh run download 44211724274 --repo "$GITHUB_REPOSITORY" \
+            --name S26-ultra-visual-v107-signed-private --dir out/v107
+          test -s out/v107/XHYN-IV-S26-ultra-visual-v107-test.apk
+      - name: Check Android APK signatures and version codes
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import re,subprocess,hashlib
+          from pathlib import Path
+          apks=[
+            ('v100',Path('out/v100.apk')),
+            ('v104',Path('out/v104.apk')),
+            ('v105',Path('out/v105.apk')),
+            ('v106',Path('out/v106.apk')),
+            ('v107',Path('out/v107/XHYN-IV-S26-ultra-visual-v107-test.apk'))
+          ]
+          records=[]
+          for label,path in apks:
+            cert=subprocess.check_output(['java','-jar',str(Path.home()/'not-found')],stderr=subprocess.DEVNULL) if False else subprocess.check_output(['java','-jar',str(Path(__import__('os').environ['ANDROID_HOME'])/'build-tools/35.0.0/lib/apksigner.jar'),'verify','--verbose','--print-certs',str(path)],text=True)
+            badging=subprocess.check_output([str(Path(__import__('os').environ['ANDROID_HOME'])/'build-tools/35.0.0/aapt2'),'dump','badging',str(path)],text=True)
+            match=re.search(r"package: name='([^']+)' versionCode='(\d+)'",badging)
+            fp=re.search(r'Signer #1 certificate SHA-256 digest: ([0-9a-fA-F]+)',cert)
+            assert match and fp,(label,cert[:500],badging[:500])
+            records.append((label,match.group(1),int(match.group(2)),fp.group(1).lower(),hashlib.sha256(path.read_bytes()).hexdigest()))
+          print('INSTALLER COMPATIBILITY REPORT')
+          for label,pkg,ver,cert,sha in records:
+            print(f'{label} package={pkg} versionCode={ver} signer_sha256={cert} apk_sha256={sha}')
+          target=records[-1]
+          for row in records[:-1]:
+            print(f'upgrade_from={row[0]} same_package={row[1]==target[1]} same_cert={row[3]==target[3]} version_increases={row[2]<target[2]}')
+          Path('out/compatibility-report.txt').write_text(
+            'Installer compatibility by published release:\n'+
+            '\n'.join(f'{lab} package={pkg} code={ver} certificate={cert} sha256={sha}' for lab,pkg,ver,cert,sha in records)+
+            '\n'+
+            '\n'.join(f'upgrade_from={row[0]} same_package={row[1]==target[1]} same_cert={row[3]==target[3]} version_increases={row[2]<target[2]}' for row in records[:-1])+'\n'
+          )
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: s26-installer-compatibility-report
+          path: out/compatibility-report.txt
+          if-no-files-found: ignore
+          retention-days: 7
