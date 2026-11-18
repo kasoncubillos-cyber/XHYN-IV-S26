@@ -97,6 +97,15 @@ final class MobileSettingsUi {
         new Choice("gta4_touch_radar_margin","Minimap vertical offset","-0.06",false,-.2,.15,.005)
     };
     private static final Choice[] PERFORMANCE={
+        // All streaming keys used by the S26 experimental preset must be
+        // listed here: the settings dialog persists only declared choices.
+        new Choice("gta4_streaming_modern","Early world streaming","true",true,"true","false"),
+        new Choice("gta4_streaming_deadline_order","Streaming request priority","true",true,"true","false"),
+        new Choice("gta4_streaming_budget_scale","Streaming budget scale","1.5",true,1,4,.25),
+        new Choice("gta4_streaming_physical_reserve_mb","Streaming reserved RAM MB","16",true,0,256,16),
+        new Choice("gta4_streaming_preload_min","Near preload margin","100",true,50,500,10),
+        new Choice("gta4_streaming_preload_max","Driving preload margin","250",true,50,500,10),
+        new Choice("gta4_streaming_prefetch_pending_limit","Extra pending request cap","256",true,16,4096,16),
         new Choice("gta4_performance_overlay","Performance overlay","off",false,"off","fps","detailed"),
         new Choice("gta4_overlay_position","Overlay position","top_right",false,"top_left","top_center","top_right","bottom_left","bottom_center","bottom_right","custom"),
         new Choice("gta4_overlay_edge_gap","Overlay edge gap","2",false,0,40,1),
