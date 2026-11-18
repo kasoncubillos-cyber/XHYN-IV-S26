@@ -15,9 +15,10 @@ final class S26GraphicsProfiles {
     static final String ULTRA_DRIVING = "ultra_driving";
     static final String SUSTAINED_60 = "sustained_60";
     static final String SUSTAINED_60_CITY = "sustained_60_city";
+    static final String ULTRA_SUSTAINED_VISUAL = "ultra_sustained_visual";
 
     static void apply(Map<String,String> values, String profile) {
-        if (!BALANCED.equals(profile) && !HIGH.equals(profile) && !MAX_EXPERIMENTAL.equals(profile) && !ULTRA_VISUAL.equals(profile) && !POLICE_LIGHTS_TRAFFIC.equals(profile) && !ULTRA_DRIVING.equals(profile) && !SUSTAINED_60.equals(profile) && !SUSTAINED_60_CITY.equals(profile))
+        if (!BALANCED.equals(profile) && !HIGH.equals(profile) && !MAX_EXPERIMENTAL.equals(profile) && !ULTRA_VISUAL.equals(profile) && !POLICE_LIGHTS_TRAFFIC.equals(profile) && !ULTRA_DRIVING.equals(profile) && !SUSTAINED_60.equals(profile) && !SUSTAINED_60_CITY.equals(profile) && !ULTRA_SUSTAINED_VISUAL.equals(profile))
             throw new IllegalArgumentException("Unknown S26 graphics profile: " + profile);
 
         // Never overwrite a frame cap the player has already tested successfully.
@@ -136,6 +137,53 @@ final class S26GraphicsProfiles {
                 values.put("gta4_native_startup_prepare_seconds", "10");
                 values.put("gta4_native_converted_texture_disk_cache", "true");
                 values.put("gta4_native_texture_reuse_extended", "false");
+                values.put("android_gpu_turbo", "false");
+                values.put("android_thermal_guard", "true");
+                break;
+            case ULTRA_SUSTAINED_VISUAL:
+                // Opt-in maximum spatial fidelity with a 60 FPS *target*.
+                // Never lower the resolution, draw distance, or LOD on heat:
+                // trade reflection refresh cadence and CPU pipeline work first.
+                // This is an experiment, not a claim of sustained 60 FPS.
+                values.put("gta4_frame_limit", "60");
+                values.put("resolution", "1080p");
+                values.put("gta4_native_upscaler", "native");
+                values.put("gta4_native_anti_aliasing", "smaa");
+                values.put("gta4_native_smaa_quality", "ultra");
+                values.put("gta4_texture_filtering", "trilinear");
+                values.put("gta4_anisotropic_filtering", "16x");
+                values.put("gta4_shadow_map_base_size", "1024");
+                values.put("gta4_shadow_distance_scale", "1.25");
+                values.put("gta4_native_shadow_interval", "1");
+                values.put("gta4_reflection_resolution", "full");
+                values.put("gta4_water_reflection_resolution", "full");
+                values.put("gta4_mirror_reflection_resolution", "full");
+                values.put("gta4_reflection_aa", "4x");
+                values.put("gta4_reflection_capture_distance", "extended");
+                // Expensive reflections may refresh less frequently without
+                // lowering their spatial resolution or source texture detail.
+                values.put("gta4_native_water_reflection_interval", "2");
+                values.put("gta4_native_environment_reflection_interval", "2");
+                values.put("gta4_draw_distance_scale", "1.4");
+                values.put("gta4_dynamic_draw_distance", "false");
+                values.put("gta4_motion_blur", "false");
+                // Reuse rather than shorten the world stream; cap speculative
+                // requests and retain physical-memory headroom for native work.
+                values.put("gta4_streaming_modern", "true");
+                values.put("gta4_streaming_deadline_order", "true");
+                values.put("gta4_streaming_budget_scale", "1.5");
+                values.put("gta4_streaming_physical_reserve_mb", "32");
+                values.put("gta4_streaming_preload_min", "120");
+                values.put("gta4_streaming_preload_max", "280");
+                values.put("gta4_streaming_prefetch_pending_limit", "256");
+                values.put("gta4_native_pipeline_workers", "2");
+                values.put("gta4_native_pipeline_prewarm", "true");
+                values.put("gta4_native_pipeline_lookahead", "true");
+                values.put("gta4_native_startup_prepare_seconds", "10");
+                values.put("gta4_native_converted_texture_disk_cache", "true");
+                values.put("gta4_native_texture_reuse_extended", "false");
+                values.put("gta4_native_max_queued_frames", "2");
+                values.put("android_perf_hint", "true");
                 values.put("android_gpu_turbo", "false");
                 values.put("android_thermal_guard", "true");
                 break;
