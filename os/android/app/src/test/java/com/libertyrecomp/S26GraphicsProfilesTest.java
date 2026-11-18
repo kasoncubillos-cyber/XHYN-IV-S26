@@ -39,6 +39,54 @@ public class S26GraphicsProfilesTest {
         }
     }
 
+    @Test public void ultraVisualSustainedKeepsFullSpatialFidelityAndThermalGuard() {
+        Map<String,String> settings = new LinkedHashMap<>();
+        settings.put("gta4_frame_limit","30");
+        settings.put("custom_setting","untouched");
+        S26GraphicsProfiles.apply(settings,S26GraphicsProfiles.ULTRA_SUSTAINED_VISUAL);
+        assertEquals("60",settings.get("gta4_frame_limit"));
+        assertEquals("1080p",settings.get("resolution"));
+        assertEquals("native",settings.get("gta4_native_upscaler"));
+        assertEquals("smaa",settings.get("gta4_native_anti_aliasing"));
+        assertEquals("ultra",settings.get("gta4_native_smaa_quality"));
+        assertEquals("trilinear",settings.get("gta4_texture_filtering"));
+        assertEquals("16x",settings.get("gta4_anisotropic_filtering"));
+        assertEquals("1024",settings.get("gta4_shadow_map_base_size"));
+        assertEquals("1.25",settings.get("gta4_shadow_distance_scale"));
+        assertEquals("full",settings.get("gta4_reflection_resolution"));
+        assertEquals("full",settings.get("gta4_water_reflection_resolution"));
+        assertEquals("full",settings.get("gta4_mirror_reflection_resolution"));
+        assertEquals("4x",settings.get("gta4_reflection_aa"));
+        assertEquals("1.4",settings.get("gta4_draw_distance_scale"));
+        assertEquals("false",settings.get("gta4_dynamic_draw_distance"));
+        assertEquals("2",settings.get("gta4_native_water_reflection_interval"));
+        assertEquals("2",settings.get("gta4_native_environment_reflection_interval"));
+        assertEquals("true",settings.get("gta4_streaming_modern"));
+        assertEquals("true",settings.get("gta4_streaming_deadline_order"));
+        assertEquals("1.5",settings.get("gta4_streaming_budget_scale"));
+        assertEquals("32",settings.get("gta4_streaming_physical_reserve_mb"));
+        assertEquals("120",settings.get("gta4_streaming_preload_min"));
+        assertEquals("280",settings.get("gta4_streaming_preload_max"));
+        assertEquals("256",settings.get("gta4_streaming_prefetch_pending_limit"));
+        assertEquals("true",settings.get("gta4_native_pipeline_prewarm"));
+        assertEquals("true",settings.get("gta4_native_converted_texture_disk_cache"));
+        assertEquals("false",settings.get("android_gpu_turbo"));
+        assertEquals("true",settings.get("android_thermal_guard"));
+        assertEquals("untouched",settings.get("custom_setting"));
+    }
+
+    @Test public void ultraVisualSustainedDoesNotModifyOlderSustainedPreset() {
+        Map<String,String> oldPreset = new LinkedHashMap<>(), ultraPreset = new LinkedHashMap<>();
+        S26GraphicsProfiles.apply(oldPreset,S26GraphicsProfiles.SUSTAINED_60_CITY);
+        S26GraphicsProfiles.apply(ultraPreset,S26GraphicsProfiles.ULTRA_SUSTAINED_VISUAL);
+        assertEquals("fsr1",oldPreset.get("gta4_native_upscaler"));
+        assertEquals("512",oldPreset.get("gta4_shadow_map_base_size"));
+        assertEquals("1.0",oldPreset.get("gta4_draw_distance_scale"));
+        assertEquals("true",oldPreset.get("gta4_dynamic_draw_distance"));
+        assertEquals("native",ultraPreset.get("gta4_native_upscaler"));
+        assertEquals("1024",ultraPreset.get("gta4_shadow_map_base_size"));
+    }
+
     @Test public void sustained60PresetKeepsOutput1080pAnd60FpsWithoutDisablingThermalGuard() {
         Map<String,String> settings=new LinkedHashMap<>();
         settings.put("gta4_frame_limit","30");
